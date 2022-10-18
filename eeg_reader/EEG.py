@@ -40,7 +40,7 @@ class EEG_Reader:
     def get_channels_amount(self):
         return self.channels
 
-    # method comment
+    # checks if there is another byte in the input_buffer that is >127, so that the whole frame is in the input_buffer
     def have_whole_frame(self):
         temp_tail = self.cBufTail + 1
         # comment what this does
@@ -56,7 +56,7 @@ class EEG_Reader:
     def at_end_of_frame(self):
         temp_tail = self.cBufTail + 1
         next_byte  = self.input_buffer[temp_tail] & 0xFF
-        # comment what this does
+        # if the most significant bit of the next byte is 1, return true because this implies this is a new frame
         if next_byte > 127:
             return True
         return False
@@ -74,21 +74,20 @@ class EEG_Reader:
             number_of_parsed_channels = 0
 
       
-                # while we have unparsed data.
+            # while we have unparsed data.
             while have_data:
             
-                #MSB = will be bigger than 127 when ___ and smaller when ____
+                #MSB = takes the last 8 bits of self.input_buffer[self.cBufTail]
                 MSB  = self.input_buffer[self.cBufTail] & 0xFF
-                # comment here
+                # if the most significant bit of MSB is 1
                 if MSB > 127:
                     processed_beginning_of_frame = False
                     number_of_parsed_channels = 0
 
-                    # comment here
+                    # check if the whole frame is already in the input_buffer
                     if self.have_whole_frame():
                         while True:
 
-                            # comment here
                             if(processed_beginning_of_frame and (MSB>127)):
                                 #we have begining of the frame inside frame
                                 #something is wrong
@@ -96,38 +95,41 @@ class EEG_Reader:
 
                             
                 
-                            # comment here
+                            # MSB without the most significant bit
                             MSB  = self.input_buffer[self.cBufTail] & 0x7F
                             processed_beginning_of_frame = True
                             self.cBufTail = self.cBufTail +1
 
-                            # comment here
+                            # next integer in the input_buffer
                             LSB  = self.input_buffer[self.cBufTail] & 0xFF
 
                             if LSB>127:
                                 break #continue as if we have new frame
 
+                            # LSB without the most significant bit
                             LSB  = self.input_buffer[self.cBufTail] & 0x7F
+                            # bitshift MSB 7 places to the left. For example: 1111 becomes 11110000000
                             MSB = MSB<<7
-                            writeInteger = LSB | MSB
-                            number_of_parsed_channels = number_of_parsed_channels+1
+                            writeInteger = LSB | MSB # bitwise or operations, simple appends the LSB behind the MSB before bitshifting
+                            number_of_parsed_channels = number_of_parsed_channels+1 
 
                             if number_of_parsed_channels > self.get_channels_amount():
                                 #we have more data in frame than we need
                                 #something is wrong with this frame
                                 break #continue as if we have new frame
     
-                            # comment here -- what does this mean
+                            # appends the new frame to the sample buffer. Don't know why it does -512
                             self.sample_buffer = np.append(self.sample_buffer,writeInteger-512)
                         
 
                             if self.at_end_of_frame():
+                                # parsed the whole frame so break
                                 break
                             else:
                                 self.cBufTail = self.cBufTail + 1
 
-                        # comment everything below
                     else:
+                        # there is no data anymore to parse
                         have_data = False
                         break
                 if(not have_data):
@@ -135,6 +137,7 @@ class EEG_Reader:
 
                 self.cBufTail = self.cBufTail +1
 
+                # check if there is more data in the buffer
                 if self.cBufTail == len(self.input_buffer):
                     have_data = False
                     break

@@ -53,7 +53,7 @@ def checkIfHaveWholeFrame():
             if nextByte > 127:
                 return True
             tempTail = tempTail +1
-        return False;
+        return False
     
 def areWeAtTheEndOfFrame():
         global cBufTail
