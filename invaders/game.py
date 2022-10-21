@@ -3,7 +3,7 @@ from directkeys import PressKey, ReleaseKey, LEFT, RIGHT, ENTER, SPACE
 import time
 
 def main():
-    os.startfile("invaders.exe")
+    os.startfile(os.getcwd() + "\\invaders\\invaders.exe")
     time.sleep(1)
     PressKey(ENTER)
     ReleaseKey(ENTER)
