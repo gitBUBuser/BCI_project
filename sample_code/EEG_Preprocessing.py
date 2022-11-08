@@ -8,23 +8,25 @@ import scipy.signal as signal
 class EEG_processer:
     def __init__(self):
         self.filter_band = (1.5, 16)
-        self.inteval = (-0.1, 0)
+        self.inteval = (-0.1,    0)
 
 
     def bandpass_filter_MNE(self, some_data):
-        return some_data.filter(self.filter_band[0], self.filter_band[1], method="icir")
+        return some_data.filter(self.filter_band[0], self.filter_band[1], method="iir")
 
-    def preprocessed_to_epoch(self, preprocessed_data, decimate=10, baseline_ival=(-.2, 0)):
-        class_ids = { "Left": 1, "Right": 2, "StartShoot:" 3, "StopShoot": 4}
+    
+   #def preprocessed_to_epoch(self, preprocessed_data, decimate=10, baseline_ival=(-.2, 0)):
+   #     class_ids = { "Left": 1, "Right": 2, "StartShoot:" 3, "StopShoot": 4}
 
-        events = mne.events_from_annotations(preprocessed_data, event_id=class_ids)[0]
-        epo_data = mne.Epochs(preprocessed_data, events, event_id=class_ids,
-                              baseline=baseline_ival, decim=decimate,
-                              reject=reject, proj=False, preload=True)
-        return epo_data
+    #    events = mne.events_from_annotations(preprocessed_data, event_id=class_ids)[0]
+    #    epo_data = mne.Epochs(preprocessed_data, events, event_id=class_ids,
+    #                          baseline=baseline_ival, decim=decimate,
+    #                          reject=reject, proj=False, preload=True)
+    #    return epo_data
+    
 
-    def correct_for_drift(self, some_data):
-        some_data.apply_baseline(self.inteval)
+    def correct_for_drift(self, some_epochs):
+        some_epochs.apply_baseline(self.inteval)
 
 
 
