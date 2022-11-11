@@ -36,6 +36,8 @@ class EEG_Reader:
     def get_serial(self):
         return self.serial_port
 
+    def get_data(self):
+        return sample_buffer
 
     def get_channels_amount(self):
         return self.channels
