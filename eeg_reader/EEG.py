@@ -1,6 +1,7 @@
 import numpy as np
 import serial
 import time
+import scipy.io
 
 
 # we might want to analyze all data at the same time -- or only pieces of the data following
@@ -8,7 +9,7 @@ import time
 # FOR a real BCI application you probably want to do feature extraction and link
 # that to a classifier which makes the decision to control an external device.
 class EEG_Reader:
-    def __init__(self, a_port, some_baudrate = 230400, a_timeout = 0):
+    def __init__(self, a_port, some_baudrate = 230400, a_timeout = 0.001):
         self.port = a_port
         self.frequency = 10000
         self.baudrate = some_baudrate
@@ -158,10 +159,42 @@ class EEG_Reader:
 
     def test(self):
         while True:
-            time.sleep(0.001)
+            time.sleep(self.timeout)
             self.read_from_port()
             print(self.sample_buffer)
 
+
+
+class EEG_recorder:
+    def __init__(self, a_port):
+        self.port = a_port
+        reader = EEG.EEG_Reader(a_port)
+        self.sampling_interval = reader.timeout
+        self.frequency = reader.frequency
+        
+        self.recorded_data = []
+        self.recording = False
+
+    def start_recording(self):
+        recording = True
+        while(recording):
+            self.record()
+
+    def stop_recording(self):
+        self.recording = False
+
+    def record(self):
+        time.sleep(self.sampling_interval)
+        reader.read_from_port()
+        recorded_data.append(reader.get_data())
+
+    def save_file(self, file_name):
+        self.stop_recording()
+
+        frequency = 10000
+        save_info = np.array(self.recorded_data)
+        wavfile.write("file_name", self.frequency, save_info)
+        self.recorded_data.clear()
 
 
 # Class for preprocessing EEG signals.
