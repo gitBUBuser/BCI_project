@@ -3,9 +3,11 @@ import time
 movements = ["Default", "Right hand right", "Left hand left", "Right leg right", "Left leg left"]
 
 for i in range (4):
-    printed = False
+    print(movements[i])
+    time.sleep(2)
     begin = time.time()
-    while (time.time()-begin < 10):
-        if (not printed):
-            print(movements[i])
-            printed = True
+    while (time.time()-begin < 8):
+        #recording
+        pass
+    print("Stop")
+    time.sleep(2)
