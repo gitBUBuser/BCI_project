@@ -1,7 +1,8 @@
 import numpy as np
 import serial
 import time
-import scipy.io
+import os
+import scipy.io.wavfile as wav
 
 
 # we might want to analyze all data at the same time -- or only pieces of the data following
@@ -38,7 +39,7 @@ class EEG_Reader:
         return self.serial_port
 
     def get_data(self):
-        return sample_buffer
+        return self.sample_buffer
 
     def get_channels_amount(self):
         return self.channels
@@ -168,9 +169,9 @@ class EEG_Reader:
 class EEG_recorder:
     def __init__(self, a_port):
         self.port = a_port
-        reader = EEG.EEG_Reader(a_port)
-        self.sampling_interval = reader.timeout
-        self.frequency = reader.frequency
+        self.reader = EEG_Reader(a_port)
+        self.sampling_interval = self.reader.timeout
+        self.frequency = self.reader.frequency
         
         self.recorded_data = []
         self.recording = False
@@ -185,15 +186,20 @@ class EEG_recorder:
 
     def record(self):
         time.sleep(self.sampling_interval)
-        reader.read_from_port()
-        recorded_data.append(reader.get_data())
+        self.reader.read_from_port()
+        self.recorded_data.append(self.reader.get_data())
 
     def save_file(self, file_name):
         self.stop_recording()
-
-        frequency = 10000
-        save_info = np.array(self.recorded_data)
-        wavfile.write("file_name", self.frequency, save_info)
+        
+        flat_data = [item for sub_list in self.recorded_data for item in sub_list]
+        print(len(flat_data))
+        
+        save_info = np.array(flat_data)
+        print(save_info.size)
+        print(save_info)
+        path = os.getcwd()  + "\\" + str(file_name)
+        wav.write(path, self.frequency, save_info)
         self.recorded_data.clear()
 
 
@@ -208,7 +214,7 @@ class EEG_processer:
         return some_data.filter(self.filter_band[0], self.filter_band[1], method="icir")
 
     def preprocessed_to_epoch(self, preprocessed_data, decimate=10, baseline_ival=(-.2, 0)):
-        class_ids = { "Left": 1, "Right": 2, "StartShoot:" 3, "StopShoot": 4}
+        class_ids = { "Left": 1, "Right": 2, "StartShoot": 3, "StopShoot": 4}
 
         events = mne.events_from_annotations(preprocessed_data, event_id=class_ids)[0]
         epo_data = mne.Epochs(preprocessed_data, events, event_id=class_ids,
