@@ -207,7 +207,7 @@ class EEG_recorder:
         raw_data = mne.io.RawArray(save_info, info)
 
         path = os.getcwd()  + "/" + str(file_name)
-        mne.export.export_raw(path, raw_data, fmt="edf")
+        mne.export.export_raw(path + ".edf", raw_data, fmt="edf")
 
 
 # Class for preprocessing EEG signals.
