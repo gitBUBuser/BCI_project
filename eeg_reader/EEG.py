@@ -197,13 +197,17 @@ class EEG_recorder:
         data = list(q_list)
         
         flat_data = [item for sub_list in data for item in sub_list]
+
         save_info = np.array(flat_data)
         print(save_info.size)
+        save_info = np.reshape(save_info, (1, -1))
+        print(save_info.size)
+        print("printed size")
         info = mne.create_info(["Cz"], self.frequency)
-        raw_data = mne.io.RawArray(flat_data, info)
+        raw_data = mne.io.RawArray(save_info, info)
 
         path = os.getcwd()  + "/" + str(file_name)
-        mne.export_raw(path, raw_data, fmt="edf")
+        mne.export.export_raw(path, raw_data, fmt="edf")
 
 
 # Class for preprocessing EEG signals.

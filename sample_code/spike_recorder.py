@@ -19,7 +19,7 @@ global connected
 connected = False
 #change name of the port here
 #port = 'COM4'
-port = '/dev/ttyACM2'
+port = 'COM5'
 baud = 230400
 global input_buffer
 global sample_buffer
@@ -144,8 +144,8 @@ def read_from_port(ser):
            reading = ser.read(1024)
            if(len(reading)>0):
                 reading = list(reading)
-                #here we overwrite if we left some parts of the frame from previous processing 
-                #should be changed             
+#here we overwrite if we left some parts of the frame from previous processing 
+#should be changed             
                 input_buffer = reading.copy()
                 print("len(reading)",len(reading))
                 handle_data(reading)
@@ -166,9 +166,7 @@ while True:
         sample_buffer = sample_buffer[-display_size:]
         plt.clf()      
 
-        plt.ylim(-500, 500)
-        print(xi)
-        plt.plot(xi * 100, yi * 100, linewidth=1, color='royalblue')
+        plt.ylim(-550, 550)
+        plt.plot(xi, yi, linewidth=1, color='royalblue')
         plt.pause(0.001)
         time.sleep(0.08)
-        

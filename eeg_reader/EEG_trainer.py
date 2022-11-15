@@ -6,7 +6,7 @@ import multiprocessing
 
 
 movements = ["Default", "Right hand right", "Left hand left"]
-recorder = EEG.EEG_recorder("/dev/ttyACM")
+recorder = EEG.EEG_recorder("COM5")
 
 def update_recorder():
     while(True):
