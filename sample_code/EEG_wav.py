@@ -6,7 +6,7 @@ import pathlib
 import numpy as np
 
 
-fs_rate, data = wavfile.read("data/BYB_Recording_2022-10-14_10.12.46.wav")
+fs_rate, data = wavfile.read("/home/baserad/Documents/Schoolwork/NDL/BCI_project/sample_code/data/BYB_Recording_2022-10-14_10.12.46.wav")
 
 data = np.array(data)
 

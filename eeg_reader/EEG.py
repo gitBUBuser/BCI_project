@@ -3,12 +3,15 @@ import serial
 import time
 import os
 import scipy.io.wavfile as wav
-
-
+import multiprocessing
+import threading
 # we might want to analyze all data at the same time -- or only pieces of the data following
 # a stimuli / trigger event
 # FOR a real BCI application you probably want to do feature extraction and link
 # that to a classifier which makes the decision to control an external device.
+
+
+
 class EEG_Reader:
     def __init__(self, a_port, some_baudrate = 230400, a_timeout = 0.001):
         self.port = a_port
@@ -16,12 +19,8 @@ class EEG_Reader:
         self.baudrate = some_baudrate
         self.timeout = a_timeout
         self.channels = 1
-
-
-        #imported variables
         self.input_buffer = []
         self.sample_buffer = []
-
         self.cBufTail = 0
 
         self.serial_port = serial.Serial(self.port, self.baudrate, timeout=self.timeout)
@@ -123,8 +122,7 @@ class EEG_Reader:
                                 break #continue as if we have new frame
     
                             # appends the new frame to the sample buffer. Don't know why it does -512
-                            self.sample_buffer = np.append(self.sample_buffer,writeInteger-512)
-                        
+                            self.sample_buffer = np.append(self.sample_buffer, writeInteger-512)
 
                             if self.at_end_of_frame():
                                 # parsed the whole frame so break
@@ -146,11 +144,8 @@ class EEG_Reader:
                     have_data = False
                     break
                 
-    
-
     def read_from_port(self):
         reading = self.get_serial().read(1024)
-
         if(len(reading)>0):
             reading = list(reading)
             #here we overwrite if we left some parts of the frame from previous processing 
@@ -158,47 +153,45 @@ class EEG_Reader:
             self.input_buffer = reading.copy()
             self.handle_data(reading)
 
-    def test(self):
-        while True:
-            time.sleep(self.timeout)
-            self.read_from_port()
-            print(self.sample_buffer)
-
-
-
 class EEG_recorder:
     def __init__(self, a_port):
         self.port = a_port
         self.reader = EEG_Reader(a_port)
         self.sampling_interval = self.reader.timeout
         self.frequency = self.reader.frequency
-        
+        self.q = multiprocessing.Queue()
         self.recorded_data = []
-        self.recording = False
+        self.recording = multiprocessing.Event()
 
     def start_recording(self):
-        recording = True
-        while(recording):
-            self.record()
+        self.recording.set()
 
-    def stop_recording(self):
-        self.recording = False
 
-    def record(self):
+    def update(self):
         time.sleep(self.sampling_interval)
         self.reader.read_from_port()
-        self.recorded_data.append(self.reader.get_data())
+
+        if self.recording.is_set():
+            self.q.put(self.reader.get_data().copy())
+
+    def stop_recording(self):
+        self.recording.clear()
 
     def save_file(self, file_name):
         self.stop_recording()
-        
-        flat_data = [item for sub_list in self.recorded_data for item in sub_list]
-        print(len(flat_data))
-        
+        q_list = []
+        while(self.q.qsize() > 0):
+            q_list.append(self.q.get())
+
+        data = list(q_list)
+        print(data)
+        print(len(data))
+        flat_data = [item for sub_list in data for item in sub_list]
         save_info = np.array(flat_data)
         print(save_info.size)
         print(save_info)
-        path = os.getcwd()  + "\\" + str(file_name)
+        path = os.getcwd()  + "/" + str(file_name)
+        print(path)
         wav.write(path, self.frequency, save_info)
         self.recorded_data.clear()
 
