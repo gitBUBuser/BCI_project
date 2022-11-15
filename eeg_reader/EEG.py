@@ -5,6 +5,7 @@ import os
 import scipy.io.wavfile as wav
 import multiprocessing
 import threading
+import mne 
 # we might want to analyze all data at the same time -- or only pieces of the data following
 # a stimuli / trigger event
 # FOR a real BCI application you probably want to do feature extraction and link
@@ -13,7 +14,7 @@ import threading
 
 
 class EEG_Reader:
-    def __init__(self, a_port, some_baudrate = 230400, a_timeout = 0.001):
+    def __init__(self, a_port, some_baudrate = 230400, a_timeout = 0.00025):
         self.port = a_port
         self.frequency = 10000
         self.baudrate = some_baudrate
@@ -40,6 +41,9 @@ class EEG_Reader:
     def get_data(self):
         return self.sample_buffer
 
+    def reset_buffer(self):
+        self.sample_buffer = []
+
     def get_channels_amount(self):
         return self.channels
 
@@ -52,7 +56,6 @@ class EEG_Reader:
             if next_byte > 127:
                 return True
             temp_tail += 1
-
         return False
 
     # checks if we are at the end of the current frame
@@ -90,6 +93,7 @@ class EEG_Reader:
                     # check if the whole frame is already in the input_buffer
                     if self.have_whole_frame():
                         while True:
+                            MSB  = self.input_buffer[self.cBufTail] & 0xFF
 
                             if(processed_beginning_of_frame and (MSB>127)):
                                 #we have begining of the frame inside frame
@@ -97,11 +101,10 @@ class EEG_Reader:
                                 break #continue as if we have new frame
 
                             
-                
                             # MSB without the most significant bit
                             MSB  = self.input_buffer[self.cBufTail] & 0x7F
                             processed_beginning_of_frame = True
-                            self.cBufTail = self.cBufTail +1
+                            self.cBufTail += 1
 
                             # next integer in the input_buffer
                             LSB  = self.input_buffer[self.cBufTail] & 0xFF
@@ -114,7 +117,7 @@ class EEG_Reader:
                             # bitshift MSB 7 places to the left. For example: 1111 becomes 11110000000
                             MSB = MSB<<7
                             writeInteger = LSB | MSB # bitwise or operations, simple appends the LSB behind the MSB before bitshifting
-                            number_of_parsed_channels = number_of_parsed_channels+1 
+                            number_of_parsed_channels += 1
 
                             if number_of_parsed_channels > self.get_channels_amount():
                                 #we have more data in frame than we need
@@ -128,7 +131,7 @@ class EEG_Reader:
                                 # parsed the whole frame so break
                                 break
                             else:
-                                self.cBufTail = self.cBufTail + 1
+                                self.cBufTail += 1
 
                     else:
                         # there is no data anymore to parse
@@ -137,7 +140,7 @@ class EEG_Reader:
                 if(not have_data):
                     break
 
-                self.cBufTail = self.cBufTail +1
+                self.cBufTail += 1
 
                 # check if there is more data in the buffer
                 if self.cBufTail == len(self.input_buffer):
@@ -163,16 +166,22 @@ class EEG_recorder:
         self.recorded_data = []
         self.recording = multiprocessing.Event()
 
+        self.stop_recording()
+
     def start_recording(self):
         self.recording.set()
 
 
     def update(self):
         time.sleep(self.sampling_interval)
+        self.reader.reset_buffer()
         self.reader.read_from_port()
 
         if self.recording.is_set():
-            self.q.put(self.reader.get_data().copy())
+            buffer = self.reader.get_data()
+            if len(buffer) > 0:
+                self.q.put(buffer)
+            
 
     def stop_recording(self):
         self.recording.clear()
@@ -180,20 +189,21 @@ class EEG_recorder:
     def save_file(self, file_name):
         self.stop_recording()
         q_list = []
+        print(self.q.qsize())
         while(self.q.qsize() > 0):
             q_list.append(self.q.get())
+        print(self.q.qsize())
 
         data = list(q_list)
-        print(data)
-        print(len(data))
+        
         flat_data = [item for sub_list in data for item in sub_list]
         save_info = np.array(flat_data)
         print(save_info.size)
-        print(save_info)
+        info = mne.create_info(["Cz"], self.frequency)
+        raw_data = mne.io.RawArray(flat_data, info)
+
         path = os.getcwd()  + "/" + str(file_name)
-        print(path)
-        wav.write(path, self.frequency, save_info)
-        self.recorded_data.clear()
+        mne.export_raw(path, raw_data, fmt="edf")
 
 
 # Class for preprocessing EEG signals.
