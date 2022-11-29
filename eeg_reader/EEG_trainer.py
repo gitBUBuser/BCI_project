@@ -6,7 +6,7 @@ import multiprocessing
 
 
 movements = ["Default", "Right hand right", "Left hand left"]
-recorder = EEG.EEG_recorder("/dev/ttyACM2")
+recorder = EEG.EEG_recorder("/dev/ttyACM0")
 
 def update_recorder():
     while(True):
@@ -17,14 +17,14 @@ update = multiprocessing.Process(target=update_recorder)
 update.start()
 
 def main():
-    for x in range(10):
+    for x in range(15):
         for i in range(len(movements)):
             print(movements[i])
             time.sleep(0.5)
 
             begin = time.time()
             recorder.start_recording()
-            time.sleep(5)
+            time.sleep(40)
             recorder.save_file(movements[i] + " " + str(x))
 
             time.sleep(0.1)

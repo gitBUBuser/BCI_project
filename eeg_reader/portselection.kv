@@ -1,0 +1,169 @@
+#:kivy 1.0.9
+
+<PortSelectorWindow>:
+    rows: 3
+    portdropper : port_drop
+    Label:
+        id: title
+        text: 'WELCOME TO EEG_TRAINER FOR NDL V:1.0'
+        size_hint: (1, 0.5)
+
+    GridLayout:
+        rows:1
+        columns: 2
+        padding:5
+        spacing:40
+        size_hint: (1,1.5)
+
+
+        GridLayout:
+            padding: 30
+            rows: 2
+            Label:
+                id: port_label
+                text: 'Port:'
+                text_size: self.size
+                padding_y:50
+                padding_x:20
+                valign:'top'
+                halign:'left'
+                size_hint_y: 1
+
+            AnchorLayout:
+                anchor_x:'center'
+                anchor_y:'top'
+                size_hint_y: 2.5
+
+                PortDrop:
+                    id: port_drop
+                   
+
+
+        GridLayout:
+            rows: 6
+
+            BoxLayout:
+                orientation:'vertical'
+                Label:
+                    id: trials_label
+                    text: 'Trials:'
+                    halign:'left'
+                    text_size: self.size
+
+
+                AnchorLayout:
+                    anchor_x: 'left'
+                    anchor_y: 'center'
+                    padding: (15,0,50,0)
+              
+                    TextInput:
+                        name: 'trials'
+                        multiline: False
+
+                        text: '10'
+                        height:30
+                        input_filter:'int'
+                        size_hint_y: None
+                        on_text: root.process_input(self)
+
+                Label:
+                    visible: False if (root and root.trials_corr) else True
+                    opacity: 1 if self.visible else 0
+
+                    id:inv_trial_label
+                    text:'invalid input!'
+                    color:'#FF0000'
+                    text_size: self.size
+                    halign: 'right'
+                    padding_x:60
+            
+
+            BoxLayout:
+                orientation:'vertical'
+                Label:
+                    id: iterations_label
+                    text: 'Iterations:'
+                    text_size: self.size
+                    halign: 'left'
+                    
+                AnchorLayout:
+                    anchor_x: 'left'
+                    anchor_y: 'center'
+                    padding: (15,0,50,0)
+                    TextInput:
+                        name: 'iterations'
+                        multiline: False
+
+                        text: '1'
+                        input_filter:'int'
+                        height:30
+                        size_hint_y: None
+                        on_text: root.process_input(self)
+
+                Label:
+                    visible: False if (root and root.iterations_corr) else True
+                    opacity: 1 if self.visible else 0
+                
+                    id:inv_iterations_label
+                    text:'invalid input!'
+                    color:'#FF0000'
+                    text_size: self.size
+                    halign: 'right'
+                    padding_x:60
+            
+            BoxLayout:
+                orientation:'vertical'
+                Label:
+                    id:time_label
+                    text: 'Seconds / Iteration:'
+                    text_size: self.size
+                    halign: 'left'
+
+                AnchorLayout:
+                    anchor_x: 'left'
+                    anchor_y: 'center'
+                    padding: (15,0,50,0)
+
+                    TextInput:
+                        name: 'seconds'
+
+                        multiline: False
+                        text: '10'
+                        input_filter:'int'
+                        height:30
+                        size_hint_y: None
+                        on_text: root.process_input(self)
+
+                Label:
+                    visible: False if (root and root.seconds_corr) else True
+                    opacity: 1 if self.visible else 0
+
+                    id:inv_time_label
+                    text:'invalid input!'
+                    color:'#FF0000'
+                    text_size: self.size
+                    halign: 'right'
+                    padding_x:60
+
+
+    AnchorLayout:
+        anchor_x:'center'
+        anchor_y:'center'
+        size_hint: (1,0.7)
+        Button:
+            size_hint: (0.4, 0.4)
+            id: continue_button
+            text: 'START'
+            disabled: False if root.can_start else True
+
+
+
+        
+                
+            
+
+
+    
+
+        
+
