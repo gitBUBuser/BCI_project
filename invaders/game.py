@@ -9,23 +9,26 @@ def main():
     ReleaseKey(ENTER)
     time.sleep(1)
 
+    PressKey(SPACE)
     #read EEG, run algorithm and call move functions
 
-def goLeft():
-    PressKey(LEFT)
-    time.sleep(0.4)
+def doNothing():
     ReleaseKey(LEFT)
-
-def goRight():
-    PressKey(RIGHT)
-    time.sleep(0.4)
     ReleaseKey(RIGHT)
 
-def startShooting():
-    PressKey(SPACE)
+def goLeft():
+    ReleaseKey(RIGHT)
+    PressKey(LEFT)
 
-def stopShooting():
-    ReleaseKey(SPACE)
+def goRight():
+    ReleaseKey(LEFT)
+    PressKey(RIGHT)
+
+#def startShooting():
+#    PressKey(SPACE)
+
+#def stopShooting():
+#    ReleaseKey(SPACE)
 
 if __name__ == "__main__":
     main()
