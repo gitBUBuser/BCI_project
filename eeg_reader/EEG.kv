@@ -1,0 +1,32 @@
+#:kivy 1.0.9
+
+<EEGTrainerWindow>:
+    GridLayout:
+        rows: 2
+            GridLayout:
+                rows: 4
+                Label:
+                    name: instructions_label
+                    text:'await instructions...'
+                    text_size: self.size
+                Label:
+                    name: time_label
+                    text: '0.00'
+                    text_size: self.size
+
+                Image:
+                    name: instructions_image
+                    source: 'WaitSign.png'
+                    size: self.texture_size
+    
+                Image:
+                    source: 'SpaceGuy.gif'
+                    size: self.texture_size
+                
+                
+
+
+
+
+
+

@@ -1,0 +1,358 @@
+#:kivy 1.0.9
+#:import utils kivy.utils
+#:import os os
+#:import funcs Code.eeg_trainer_functions
+
+<SelectionScreen>:
+    user_interface: _ui
+    PortSelectorWindow:
+        id: _ui
+
+<PortSelectorWindow>:
+    rows: 3
+    portdropper : port_drop
+    Label:
+        id: title
+        text: '[b]EEG_TRAINER FOR [i]NDL[/i] V:1.01[/b]'
+        markup: True
+        size_hint: (1, 0.3)
+        text_size: self.size
+        padding: 50, 40
+        halign: 'left'
+        valign: 'top'
+
+    GridLayout:
+        rows:1
+        columns: 2
+        padding: (5,5, 60, 5)
+        spacing:100
+        size_hint: (1,1.5)
+        BoxLayout:
+            orientation:'vertical'
+            spacing: 60
+            BoxLayout:
+                orientation:'vertical'
+                padding: 30, 10
+                spacing: 0
+                Label:
+                    id: port_label
+                    text: 'Port:'
+                    text_size: self.size
+                    valign:'top'
+                    halign:'left'
+                AnchorLayout:
+                    anchor_x:'center'
+                    anchor_y:'top'
+                    size_hint_y:2.5
+                    SpecCustom:
+                        borders: 2, 'solid', utils.get_color_from_hex('#705d56')
+                        height:175
+                        anchor_x:'center'
+                        anchor_y:'top'
+                        id: port_drop
+                        root: root
+                        canvas.before:
+                            Color:
+                                rgb: utils.get_color_from_hex('#566970')
+                            Rectangle:
+                                pos: self.pos
+                                size: self.size
+            BoxLayout:
+                orientation:'vertical'
+                Label:
+                    id: save_label
+                    text: '----- select save folder -----'
+                    text_size: self.size
+                    padding_y: 0
+                    valign:'bottom'
+                    halign:'center'
+                AnchorLayout:
+                    anchor_y: 'top'
+                    padding: 30,0,30,0
+                    ValEntry:
+                        name: 'path'
+                        input_filter: None
+                        text: os.getcwd()
+                        on_text: root.process_text_input(self)
+                ErrorLabel:
+                    padding: 40,0
+                    halign: 'left'
+                    valign: 'top'
+                    visible: not root.value_corrs['path']
+
+            
+                    
+
+        
+        GridCustom:
+            rows: 4
+            borders: 2, 'solid', utils.get_color_from_hex('#705d56')
+            padding: (20, 0, 5, 0)
+            canvas.before:
+                Color:
+                    rgb: utils.get_color_from_hex('#566970')
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+            BoxLayout:
+                orientation:'vertical'
+                Label:
+                    id: trials_label
+                    text: 'Trials:'
+                    halign:'left'
+                    text_size: self.size
+
+
+                AnchorLayout:
+                    anchor_x: 'left'
+                    anchor_y: 'center'
+                    padding: (10,0,25,0)
+              
+                    ValEntry:
+                        on_text: root.process_text_input(self)
+                        name: 'trials'
+                        text: funcs.read_attribute_from_ods(self.name)
+
+                ErrorLabel:
+                    visible: not root.value_corrs['trials']
+
+            BoxLayout:
+                orientation:'vertical'
+                Label:
+                    id: iterations_label
+                    text: 'Iterations:'
+                    text_size: self.size
+                    halign: 'left'
+                    
+                AnchorLayout:
+                    anchor_x: 'left'
+                    anchor_y: 'center'
+                    padding: (10,0,25,0)
+                    ValEntry:
+                        on_text: root.process_text_input(self)
+                        name: 'iterations'
+                        text: funcs.read_attribute_from_ods(self.name)
+
+                ErrorLabel:
+                    visible: not root.value_corrs['iterations']
+
+            BoxLayout:
+                orientation:'vertical'
+                Label:
+                    id:time_label
+                    text: 'Seconds / Iteration:'
+                    text_size: self.size
+                    halign: 'left'
+
+                AnchorLayout:
+                    anchor_x: 'left'
+                    anchor_y: 'center'
+                    padding: (10,0,25,0)
+
+                    ValEntry:
+                        on_text: root.process_text_input(self)
+                        name: 'seconds'
+                        text: funcs.read_attribute_from_ods(self.name)
+
+                ErrorLabel:
+                    visible: not root.value_corrs['seconds']
+
+            BoxLayout:
+                orientation:'vertical'
+                Label:
+                    id:wait_label
+                    text: 'seconds between iterations: '
+                    text_size: self.size
+                    halign: 'left'
+                AnchorLayout:
+                    anchor_x: 'left'
+                    anchor_y: 'center'
+                    padding: (10,0,25,0)
+                    ValEntry:
+                        on_text: root.process_text_input(self)
+                        name: 'wait'
+                        text: funcs.read_attribute_from_ods(self.name)
+                ErrorLabel:
+                    visible: not root.value_corrs['wait']
+                
+
+    AnchorLayout:
+        anchor_x:'center'
+        anchor_y:'center'
+        size_hint: (1,0.7)
+        Button:
+            size_hint: (0.4, 0.4)
+            id: continue_button
+            text: 'START'
+            on_release:app.start_trainer()
+            disabled: not root.can_start
+
+
+<ErrorLabel>:
+    opacity: 1 if self.visible else 0
+    text:'[b]X[/b]  [i]invalid input![/i]'
+    markup: True
+    color:'#FF0000'
+    text_size: self.size
+    halign: 'right'
+    padding_x:60
+
+<ValEntry@TextInput>:
+    multiline: False
+    input_filter:'int'
+    height: 30
+    width: 50
+    size_hiny_x: None
+    size_hint_y: None
+
+
+<EEGTrainer>:
+    user_interface: _ui
+    EEGTrainerWindow:
+        id: _ui
+    
+<EEGTrainerWindow>:
+    eeg_plot: _eeg_plot
+
+    orientation:'vertical'
+
+    canvas:
+        Color: 
+            rgb: (0,0,0,0)
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+
+    GridLayout:
+        rows: 2
+        spacing: 0
+        padding: 10, 10, 10, 10
+        GridLayout:
+            rows: 5
+            spacing: 10
+            padding: 10, 10, 10 ,10
+            
+            GridLayout: 
+                rows:1
+                columns: 2
+                spacing: 20
+                AnchorLayout:
+                    anchor_x: 'left'
+                    anchor_y: 'top'
+                    spacing: 0
+                    BorderLayout_1:
+                        borders: 2, 'solid', utils.get_color_from_hex('#705d56')
+                        spacing: 0
+                        orientation:'vertical'
+                        size_hint:(0.3,1)
+                        padding: 10, 5, 10, 5
+                        canvas.before:
+                            Color:
+                                rgb: utils.get_color_from_hex('#566970')
+                            Rectangle:
+                                pos: self.pos
+                                size: self.size
+                        
+                        Label:
+                            name: 'move_label'
+                            markup:True
+                            text: '[b][i]TRIAL:[/i]      ' + root.trial_display_str + '[/b]'
+                            text_size: self.size
+                            valign: 'top'
+                            color: utils.get_color_from_hex('#edebea')
+                        Label:
+                            name: 'iterations_label'
+                            markup:True
+                            text: '[b][i]iteration:[/i]   ' + root.iteration_display_str + '[/b]'
+                            text_size: self.size
+                            valign: 'top'
+                            color: utils.get_color_from_hex('#edebea')
+                        Label:
+                            name: 'time_label'
+                            markup:True
+                            text: '[b][i]seconds:[/i]   ' + root.time_display_str + "[i]s[/i][/b]"
+                            text_size: self.size
+                            valign: 'top'
+                            color: utils.get_color_from_hex('#edebea')
+
+                    AnchorLayout:
+                        anchor_x:'right'
+                        anchor_y:'top'
+                        BorderLayout_1:
+                            borders: 2, 'solid', utils.get_color_from_hex('#705d56')
+                            spacing: 0
+                            size_hint: (0.3,1)
+                            orientation:'vertical'
+                            padding: 10, 5, 10, 5
+                            canvas.before:
+                                Color:
+                                    rgb: utils.get_color_from_hex('#566970')
+                                Rectangle:
+                                    pos: self.pos
+                                    size: self.size
+                        
+                            Label:
+                                name: 'move_label'
+                                markup:True
+                                text: '[b]MOVE:[/b]'
+                                text_size: self.size
+                                valign: 'top'
+                                halign: 'center'
+                                bold:True
+                                color: utils.get_color_from_hex('#edebea')
+                            Label:
+                                name: 'instruction_label_ui'
+                                markup:True
+                                text: '[i]' + root.instruction_text + '[/i]'
+                                
+                                text_size: self.size
+                                halign: 'center'
+                                valign: 'top'
+                                color: utils.get_color_from_hex('#edebea')
+                            Label:
+                                name: 'move_index_ui'
+                                markup:True
+                                text: '[i]' + root.move_index_text + '[/i]'
+                                text_size: self.size
+                                halign: 'right'
+                                valign: 'top'
+
+            Label:
+                halign: 'center'
+                valign: 'top'
+                name: 'instructions_label'
+                markup: True
+                text:'[i]' + root.instruction_text + '[/i]'
+                text_size: self.size
+            Image:
+                name: 'instructions_image'
+                source: root.instructions_image_source
+                size: self.texture_size
+            Image:
+                source: os.path.join(funcs.graphics_dir(), 'SpaceGuy.gif')
+                size: self.texture_size
+
+        BoxLayout:
+            padding: 20, 20, 20, 20
+            size_hint: (1,0.7)
+            orientation:'vertical'
+            id:_eeg_canvas 
+            BestPlot:
+                borders: 2, 'solid', utils.get_color_from_hex('#705d56')
+                id: _eeg_plot
+        
+
+<BestPlot@BetterPlot+BorderBehavior>:
+<BorderLayout_1@BoxLayout+BorderBehavior>:
+<SpecCustom@CustomDropDown+BorderBehavior>:
+<CustomAnchor@AnchorLayout+BorderBehavior>:
+<GridCustom@GridLayout+BorderBehavior>:
+                
+                
+
+
+
+
+
+
