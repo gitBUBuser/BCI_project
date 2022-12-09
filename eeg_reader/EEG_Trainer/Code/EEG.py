@@ -6,6 +6,7 @@ import scipy.io.wavfile as wav
 import multiprocessing
 import threading
 import mne 
+import Code.eeg_trainer_functions as funcs
 # we might want to analyze all data at the same time -- or only pieces of the data following
 # a stimuli / trigger event
 # FOR a real BCI application you probably want to do feature extraction and link
@@ -14,17 +15,24 @@ import mne
 
 
 class EEG_Reader:
-    def __init__(self, a_port, some_baudrate = 230400, a_timeout = 0.00025):
-        self.port = a_port
-        self.frequency = 10000
-        self.baudrate = some_baudrate
-        self.timeout = a_timeout
-        self.channels = 1
+    def __init__(self, port, baud_rate = funcs.read_attribute_from_ods("baud_rate"),
+                 frequency = funcs.read_attribute_from_ods("frequency"), 
+                 timeout = funcs.read_attribute_from_ods("time_out"),
+                 channels = funcs.read("channels")):
+
+        self.channels = channels
+        self.port = port
+        self.frequency = frequency
+        self.baud_rate = baud_rate
+        self.timeout = timeout
+
+        self.n_channels = len(self.channels)
         self.input_buffer = []
         self.sample_buffer = []
+
         self.cBufTail = 0
 
-        self.serial_port = serial.Serial(self.port, self.baudrate, timeout=self.timeout)
+        self.serial_port = serial.Serial(self.port, self.baud_rate, timeout=self.timeout)
 
         if self.serial_port.is_open == False:
             self.serial_port.open()
@@ -45,7 +53,7 @@ class EEG_Reader:
         self.sample_buffer = []
 
     def get_channels_amount(self):
-        return self.channels
+        return self.n_channels
 
     # checks if there is another byte in the input_buffer that is >127, so that the whole frame is in the input_buffer
     def have_whole_frame(self):
@@ -157,30 +165,34 @@ class EEG_Reader:
             self.handle_data(reading)
 
 class EEG_recorder:
-    def __init__(self, a_port, path = os.getcwd()):
-        self.port = a_port
-        self.reader = EEG_Reader(a_port)
-        self.sampling_interval = self.reader.timeout
-        self.frequency = self.reader.frequency
+    def __init__(self, port, path = os.getcwd(), record_from_start = False):
+
+        self.reader = EEG_Reader(port)
         self.q = multiprocessing.Queue()
-        self.recorded_data = []
+        self.epochs = multiprocessing.Queue()
         self.recording = multiprocessing.Event()
-        self.path = path
         self.latest = multiprocessing.Queue()
+        
+        self.path = path
+
+        if record_from_start:
+            self.start_recording()
+        else:
+            self.stop_recording()
         self.stop_recording()
 
     def start_recording(self):
         self.recording.set()
 
-
     def update(self):
-        time.sleep(self.sampling_interval)
+        time.sleep(self.reader.timeout)
         self.reader.reset_buffer()
         self.reader.read_from_port()
         buffer = self.reader.get_data()
+
         if len(buffer) > 0:
             self.latest.put(buffer)
-        self.latest.put(buffer)
+
         if self.recording.is_set():
             if len(buffer) > 0:
                 self.q.put(buffer)
@@ -189,37 +201,67 @@ class EEG_recorder:
         latest_list = []
         while (self.latest.qsize() > 0):
             latest_list.append(self.latest.get())
-
-        data = list(latest_list)
         flat = [item for sub_list in data for item in sub_list]
         return flat
+
+    def get_recording_q(self):
+        q_list = []
+        while(self.q.qsize() > 0):
+            q_list.append(self.q.get())
+        return [item for sub_list in q_list for item in sub_list]
+
+    def get_epochs_annotations(self):
+        epochs = []
+
+        while(self.epochs.qsize() > 0):
+            epochs.append(self.epochs.get())
+
+        epochs_w_durations = []
+        for i in range(len(epochs)):
+            if epochs[i].startsWith("stop"):
+                continue
+
+            epoch_tag = epochs[i][0]
+            duration = 0
+            for j in range(i, len(epochs)):
+                next_epoch_tag = epochs[j][0]
+                if next_epoch_tag == f"stop {epoch_tag}":
+                    duration = float(epochs[j][1]) - float(epochs[i][1])
+                    break
+
+            epochs_w_durations.append([epochs[i][0], float(epochs[i][1]), duration])
+
+        epochs_T = np.array(epochs_w_durations).T
+        return mne.Annotations(epochs_T[1], epochs_T[2], epochs_T[0])
+
 
     def stop_recording(self):
         self.recording.clear()
 
+    def start_epoch(self, time, tag):
+        self.epochs.put(([tag, time]))
+
+    def end_epoch(self, time, tag):
+        self.epochs.put([f"stop {tag}", time])
+
     def save_file(self, file_name):
         self.stop_recording()
-        q_list = []
-        print(self.q.qsize())
-        while(self.q.qsize() > 0):
-            q_list.append(self.q.get())
-        print(self.q.qsize())
 
-        data = list(q_list)
-        
-        flat_data = [item for sub_list in data for item in sub_list]
+        q_list = self.get_recording_q()
+        annotations = self.get_epochs_annotations()
 
-        save_info = np.array(flat_data)
-        print(save_info.size)
-        save_info = np.reshape(save_info, (1, -1))
-        print(save_info.size)
-        print("printed size")
-        info = mne.create_info(["Cz"], self.frequency)
+        save_info = np.reshape(q_list, (self.reader.n_channels, -1))
+        info = mne.create_info(self.reader.channels, self.reader.frequency)
+
         raw_data = mne.io.RawArray(save_info, info)
+        raw_data.set_annotations(annotations)
 
         path = os.path.join(self.path, str(file_name))
-        mne.export.export_raw(path + ".edf", raw_data, fmt="edf")
 
+        while os.path.exists(path + ".edf"):
+            path += "I"
+
+        mne.export.export_raw(path + ".edf", raw_data, fmt="edf")
 
 # Class for preprocessing EEG signals.
 class EEG_processer:

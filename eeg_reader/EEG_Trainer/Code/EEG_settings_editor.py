@@ -105,7 +105,8 @@ class PortSelectorWindow(GridLayout):
         "seconds": True,
         "port": True,
         "wait": True,
-        "path": True
+        "path": True,
+        "subject": True
     })
 
     portdropper = ObjectProperty(None, allownone= True)

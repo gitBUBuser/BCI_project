@@ -46,7 +46,7 @@
                     size_hint_y:2.5
                     SpecCustom:
                         borders: 2, 'solid', utils.get_color_from_hex('#705d56')
-                        height:175
+                        height:120
                         anchor_x:'center'
                         anchor_y:'top'
                         id: port_drop
@@ -79,10 +79,27 @@
                     halign: 'left'
                     valign: 'top'
                     visible: not root.value_corrs['path']
-
-            
-                    
-
+                
+                Label:
+                    id: subject_label
+                    text: 'subject/filename:'
+                    text_size: self.size
+                    padding_y: 0
+                    valign:'bottom'
+                    halign:'center'
+                AnchorLayout:
+                    anchor_y: 'top'
+                    padding: 30,0,30,0
+                    ValEntry:
+                        name: 'subject'
+                        input_filter: None
+                        text: 'no_subject'
+                        on_text: root.process_text_input(self)
+                ErrorLabel:
+                    padding: 40,0
+                    halign: 'left'
+                    valign: 'top'
+                    visible: not root.value_corrs['subject']
         
         GridCustom:
             rows: 4

@@ -9,9 +9,10 @@ from os import listdir
 from scipy import fft
 from scipy import fftpack
 from os.path import isfile, join
+from scipy.signal import spectrogram
+from scipy.signal import hilbert
 
-
-path = "/home/baserad/Documents/Schoolwork/NDL/BCI_project/eeg_reader/data/Alexander Jansson/"
+path = "/home/baserad/Documents/Schoolwork/NDL/BCI_project/eeg_reader/EEG_Trainer/Data"
 processor = preprocessing.EEG_processer()
 onlyfiles = [f for f in listdir(path) if isfile(join(path, f))]
 print(onlyfiles)
@@ -31,7 +32,6 @@ for a_file in eeg_training_data:
     a_file.load_data()
 
 
-# creating a pretend signal so we can plot all PSD's (fourier components):
 for signal in eeg_training_data:
     signal.filter(low, hi)
     signal.notch_filter(np.arange(60, 240, 60))
@@ -68,9 +68,14 @@ def compute_average(ffts):
     return np.array(average)
         
 
+defaults_FFT = []
+left_left_FFT = []
+right_right_FFT = []
+
 defaults = []
 left_left = []
 right_right = []
+
 
 for i in range(len(data)):
     signal = data[i]
@@ -85,56 +90,83 @@ for i in range(len(data)):
     freq = np.array(fftpack.fftfreq(n, ts))[range(int(n/2))]
     ch_name = added_signals.ch_names[i]
 
-    if ch_name.startswith("Default"):
-        defaults.append(FFT)
+    if ch_name.startswith("default"):
+        defaults_FFT.append(FFT)
+        defaults.append(data[i])
         labels.append("Default")
 
-    if ch_name.startswith("Right"):
-        right_right.append(FFT)
+    if ch_name.startswith("right"):
+        right_right_FFT.append(FFT)
+        right_right.append(data[i])
         labels.append("Right -> right")
 
-    if ch_name.startswith("Left"):
-        left_left.append(FFT)
+    if ch_name.startswith("left"):
+        left_left_FFT.append(FFT)
+        left_left.append(data[i])
         labels.append("Left -> left")
 
 
 print(right_right)
-avg_rhr = compute_average(right_right)
-avg_lhl = compute_average(left_left)
-avg_def = compute_average(defaults)
-added_signals.plot()
-plt.show()
-"""default_signal = added_signals.get_data()[0]
-fr = 128
-samp = len(default_signal)
-time = samp / fr
-ts = 1 / fr
+avg_rhr = compute_average(right_right_FFT)
+avg_lhl = compute_average(left_left_FFT)
+avg_def = compute_average(defaults_FFT)
 
-time_line = np.arange(0, time, ts)
+#computes the average of the items in time_series
+def compute_average_timeseries(time_series):
+    avg_t_s = []
+    for i in range(len(time_series[0])):
+        avg = 0
+        for j in range(len(time_series)):
+            avg += time_series[j][i]
+        avg_t_s.append(avg / len(time_series))
+    return np.array(avg_t_s)
+            
 
-hilbert = s_signal.hilbert(default_signal)
-analytic_signal = abs(hilbert)
-ax.plot(time_line, analytic_signal, label="hilbert", c="yellow")
-ax.plot(time_line, default_signal, label="default", c="blue")
-plt.legend()
-plt.show()"""
 
 print(freq.shape)
 print(avg_rhr.shape)
 
+#hil_rr = hilbert(avg_rhr)
+
+#ax.plot(freq, np.abs(hil_rr), label="hilbert_rr", c="orange")
 ax.plot(freq, avg_def, label="default", c="red")
 ax.plot(freq, avg_rhr, label="right->right", c="blue")
 ax.plot(freq, avg_lhl, label="left->left", c="green")
 
 plt.legend()
+plt.show()
 
+fig, ax = plt.subplots(3)
+
+avg_ts_right = compute_average_timeseries(right_right)
+avg_ts_left = compute_average_timeseries(left_left)
+avg_ts_default = compute_average_timeseries(defaults)
+
+f, t, Sxx = spectrogram(avg_ts_right, ideal_sample_rate)
+
+ax[0].set_title("right -> right")
+ax[0].pcolormesh(t, f, Sxx, shading="gouraud")
+#ax[0].ylabel('Frequency [Hz]')
+#ax[0].xlabel('Time [sec]')
+
+f, t, Sxx = spectrogram(avg_ts_left, ideal_sample_rate)
+
+ax[1].set_title("left -> left")
+ax[1].pcolormesh(t, f, Sxx, shading="gouraud")
+#ax[1].ylabel('Frequency [Hz]')
+#ax[1].xlabel('Time [sec]')
+
+f, t, Sxx = spectrogram(avg_ts_default, ideal_sample_rate)
+
+ax[2].set_title("default")
+ax[2].pcolormesh(t, f, Sxx, shading="gouraud")
+#ax[2].ylabel('Frequency [Hz]')
+#ax[2].xlabel('Time [sec]')
 
 
 plt.show()
-
-
-
      
+
 #labels = mne.label(["def1, def2, def3, lhl1, lhl2, lhl3, rhr1, rhr2, rhr3"])
 
 #added_signals.get_channel.plot_psd(average=False, color="red", spatial_colors=False)

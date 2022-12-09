@@ -37,11 +37,14 @@ import Code.EEG as EEG
 import Code.eeg_trainer_functions as funcs
 
 recorder = None
+stop_update = multiprocessing.Event()
 
 def update_recorder():
     global recorder
     while True:
         recorder.update()
+        if stop_update.is_set():
+            break
     
 recorder_loop_T = multiprocessing.Process(target=update_recorder)
 
@@ -81,42 +84,54 @@ class EEGTrainer(Screen):
         #Timer variables.
         self.iteration_timer = 0
         self.wait_timer = 0
-
+        self.run_time = 0
          #Variables corresponding to stage of training
         self.current_trial = 1
         self.current_move = 0
         self.current_iteration = 1
 
         #Buffer used for plotting online EEG data
-        self.plot_buffer = list(np.zeros(50000))
-        print(self.plot_buffer)
-
+        
+        self.plot_buffer_full = list(np.zeros(50000))
         self.target_condition = False
         self.movement_just_started = False
         self.movement_just_ended = True
    
         #True first main loop, otherwise False.
         self.just_started = True
+
     def stop(self):
         global recorder
-        try:
-            recorder.save_file("last")
-            recorder_loop_T.close()
-        except:
-            pass
+        stop_update.set()
+
+        recorder.save_file(self.subject)
+        print("saved_file")
+        print("stopped rec")
+        recorder.get_recording_q()
+        print("got Q")
+        recorder.get_latest()
+        print("got latest")
+
+        recorder_loop_T.join()
+        print("stopped thread")
+  
+
     def initialize(self, settings):
         global recorder
+
+        self.subject = settings.get["subject"]
         self.port = settings.get["port"]
+        self.path = settigns.get["path"]
+
         self.port = self.port.split(" ")[0]
-
-        recorder = EEG.EEG_recorder(self.port)
-
-        recorder_loop_T.start()
 
         self.trials = int(settings.get["trials"])
         self.iterations = int(settings.get["iterations"]) 
         self.iteration_time = int(settings.get["seconds"])
         self.wait_time = int(settings.get["wait"])
+        
+        recorder = EEG.EEG_recorder(self.port, self.path, record_from_start=True)
+        recorder_loop_T.start()
 
         Clock.schedule_interval(self.main_loop, .1)
 
@@ -140,7 +155,7 @@ class EEGTrainer(Screen):
     def sample(self):
         global recorder
         for ele in recorder.get_latest():
-            self.plot_buffer.append(ele)
+            self.plot_buffer_full.append(ele)
 
     #### END ###
 
@@ -148,15 +163,17 @@ class EEGTrainer(Screen):
     def graph_plot(self):
         global recorder
         self.sample()
-        sample_rate = recorder.frequency
+
+
         plotted_seconds = 5
-        plotted_values = plotted_seconds * sample_rate
-        self.plot_buffer = self.plot_buffer[-int(plotted_values):]
-        xi = np.arange(-plotted_seconds, 0, 1 / sample_rate)
+        plotted_values = plotted_seconds * recorder.frequency
+        self.plot_buffer_full = self.plot_buffer_full[-int(plotted_values):]
+        downsampled_rate = 250
+        downsampled_plot = self.plot_buffer_full[0::int(recorder.frequency / downsampled_rate)]
+        xi = np.arange(-plotted_seconds, 0, 1 / downsampled_rate)
         plt.clf()
-        values = np.array(self.plot_buffer)
-        plt.ylim(-25, 25)
-        plt.plot(xi, self.plot_buffer, linewidth=1, color='royalblue')
+        plt.ylim(-500, 500)
+        plt.plot(xi, downsampled_plot, linewidth=1, color='royalblue')
         self.user_interface.eeg_plot.draw()
         
     
@@ -179,7 +196,6 @@ class EEGTrainer(Screen):
                 pass
     
     ##### METHODS FOR RETURNING DISPLAY VALUES ####
-
     def set_display_time_text(self, time, max_time):
         self.user_interface.time_display_str = f'{np.round(time, 1)}s / {max_time}'
 
@@ -196,7 +212,8 @@ class EEGTrainer(Screen):
 
       # Main loop of the trainer application. nand is the time since last update.
     def main_loop(self, nand):
-
+        global recorder
+        self.run_time += nand
         self.graph_plot()
         
         if self.wait_timer > self.wait_time:
@@ -210,7 +227,7 @@ class EEGTrainer(Screen):
             self.update_labels()
             self.instructions_on_move()
             self.just_started = False
-            recorder.start_recording()
+            recorder.start_epoch(self.run_time, self.movements[self.current_move])
 
         if self.target_condition:
             self.iteration_timer += nand
@@ -225,11 +242,13 @@ class EEGTrainer(Screen):
             self.set_display_time_text(self.wait_timer, self.wait_time)
 
         if self.movement_just_ended:
+            if not self.just_started:
+                recorder.end_epoch(self.run_time, self.movements[self.current_move])
+
             self.movement_just_ended = False
             self.update_labels()
             self.instructions_on_wait()
-            if not self.just_started:
-                recorder.save_file(movements[self.current_move] + " " + str(self.current_iteration) + " " + str(self.current_trial))
+           
 
 #Updates the EEG recorder
 def update_recorder():
