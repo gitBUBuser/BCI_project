@@ -33,9 +33,23 @@ class EEGTrainerApp(App):
         self.trainer_screen.initialize(self.selection_screen.user_interface.settings)
         print("started_trainer")
 
-    def on_stop(self):
+    def on_request_close(self, *args):
+        print("tried to stop")
         self.selection_screen.stop()
         self.trainer_screen.stop()
-
+    
+    def on_stop(self):
+        print("tried to stop throught stop")
+        try:
+            self.selection_screen.stop()
+            print("stopped selection")
+        except:
+            pass
+        try: 
+            self.trainer_screen.stop()
+            print("stopped trainer")
+        except:
+            pass
+    
 if __name__ == "__main__":
     EEGTrainerApp().run()

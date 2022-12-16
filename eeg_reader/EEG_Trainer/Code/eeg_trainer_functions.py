@@ -43,14 +43,15 @@ def read(attribute):
 
 #Class for storing settings.
 class SettingsInfo():
-    def __init__(self, trials = read("trials")[0], iterations = read("iterations")[0], seconds = read("seconds")[0], wait_time = read("wait")[0], port = None, path = default_path()):
+    def __init__(self, trials = read("trials")[0], iterations = read("iterations")[0], seconds = read("seconds")[0], wait_time = read("wait")[0], port = None, path = default_path(), subject = "no_subject"):
         self.get = {
             "trials": trials,
             "iterations": iterations,
             "seconds": seconds,
             "wait": wait_time,
             "port": port,
-            "path": path
+            "path": path,
+            "subject": subject
         }
 
         self.invalid_inputs = {
@@ -58,7 +59,8 @@ class SettingsInfo():
             "iterations": ["", "0"],
             "seconds": ["", "0"],
             "wait": [""],
-            "port": ["", "..."]
+            "port": ["", "..."],
+            "subject": [""]
         }
 
     def set_value(self, key, value):
@@ -84,21 +86,8 @@ class SettingsInfo():
 
 def get_ports():
     return list(list_ports.comports(include_links=True))
-"""
-def get_ports():
-    device_re = re.compile(b"Bus\s+(?P<bus>\d+)\s+Device\s+(?P<device>\d+).+ID\s(?P<id>\w+:\w+)\s(?P<tag>.+)$", re.I)
-    df = subprocess.check_output("lsusb")
-    devices = []
-    texts = []
-    for i in df.split(b'\n'):
-        if i:
-            info = device_re.match(i)
-            if info:
-                dinfo = info.groupdict()
-                dinfo['device'] = '/dev/bus/usb/%s/%s' % (dinfo.pop('bus'), dinfo.pop('device'))
-                devices.append(dinfo)
-    return [device["device"] for device in devices]
-"""
+
+
 #Imported from https://gist.github.com/gaurav-b98/42aa141311af5f08781522cc6eec859a
 class BorderBehavior(Widget):
     borders = ObjectProperty(None)
