@@ -2,7 +2,7 @@ import os
 from directkeys import PressKey, ReleaseKey, LEFT, RIGHT, ENTER, SPACE
 import time
 
-def main():
+def startGame():
     os.startfile(os.getcwd() + "\\invaders\\invaders.exe")
     time.sleep(1)
     PressKey(ENTER)
@@ -31,4 +31,4 @@ def goRight():
 #    ReleaseKey(SPACE)
 
 if __name__ == "__main__":
-    main()
+    startGame()
