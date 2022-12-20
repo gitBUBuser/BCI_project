@@ -45,11 +45,15 @@ class EEGTrainerApp(App):
             print("stopped selection")
         except:
             pass
+        """
         try: 
             self.trainer_screen.stop()
             print("stopped trainer")
         except:
             pass
+        """
+        self.trainer_screen.stop()
+        print("stopped trainer")
     
 if __name__ == "__main__":
     EEGTrainerApp().run()

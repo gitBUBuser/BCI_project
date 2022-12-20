@@ -39,12 +39,14 @@ import Code.eeg_trainer_functions as funcs
 recorder = None
 stop_update = multiprocessing.Event()
 
+
 def update_recorder():
     global recorder
     while True:
         recorder.update()
         if stop_update.is_set():
             break
+
     
 recorder_loop_T = multiprocessing.Process(target=update_recorder)
 
@@ -121,18 +123,18 @@ class EEGTrainer(Screen):
 
         self.subject = settings.get["subject"]
         self.port = settings.get["port"]
-        self.path = settigns.get["path"]
+        self.path = settings.get["path"]
 
         self.port = self.port.split(" ")[0]
 
         self.trials = int(settings.get["trials"])
-        self.iterations = int(settings.get["iterations"]) 
-        self.iteration_time = int(settings.get["seconds"])
-        self.wait_time = int(settings.get["wait"])
+        self.iterations = int(settings.get["iterations"])
+        self.iteration_time = float(settings.get["seconds"])
+        self.wait_time = float(settings.get["wait"])
         
         recorder = EEG.EEG_recorder(self.port, self.path, record_from_start=True)
+        recorder.start_recording()
         recorder_loop_T.start()
-
         Clock.schedule_interval(self.main_loop, .1)
 
     #Provides user with instructions while waiting.
@@ -163,13 +165,14 @@ class EEGTrainer(Screen):
     def graph_plot(self):
         global recorder
         self.sample()
+        freq = recorder.reader.frequency
 
 
         plotted_seconds = 5
-        plotted_values = plotted_seconds * recorder.frequency
+        plotted_values = plotted_seconds * freq
         self.plot_buffer_full = self.plot_buffer_full[-int(plotted_values):]
         downsampled_rate = 250
-        downsampled_plot = self.plot_buffer_full[0::int(recorder.frequency / downsampled_rate)]
+        downsampled_plot = self.plot_buffer_full[0::int(freq / downsampled_rate)]
         xi = np.arange(-plotted_seconds, 0, 1 / downsampled_rate)
         plt.clf()
         plt.ylim(-500, 500)
@@ -227,7 +230,7 @@ class EEGTrainer(Screen):
             self.update_labels()
             self.instructions_on_move()
             self.just_started = False
-            recorder.start_epoch(self.run_time, self.movements[self.current_move])
+            recorder.start_epoch(self.movements[self.current_move])
 
         if self.target_condition:
             self.iteration_timer += nand
@@ -243,7 +246,7 @@ class EEGTrainer(Screen):
 
         if self.movement_just_ended:
             if not self.just_started:
-                recorder.end_epoch(self.run_time, self.movements[self.current_move])
+                recorder.end_epoch(self.movements[self.current_move])
 
             self.movement_just_ended = False
             self.update_labels()

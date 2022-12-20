@@ -35,15 +35,33 @@ def get_moves():
 def get_images():
     return [os.path.join(graphics_dir(), img) for img in read("movement_images")]
 
-def read_attribute_from_ods(attribute):
-    return str(int(read_ods(settings_path())[attribute][0]))
+def read_ods_attr(attribute, is_int = False):
+    if is_int:
+        return str(int(read_ods(settings_path())[attribute][0]))
+    return str(read_ods(settings_path())[attribute][0])
 
 def read(attribute):
-    return read_ods(settings_path())[attribute]
+    raw_data = list(read_ods(settings_path())[attribute])
+    filtered_data = []
+    for value in raw_data:
+        if not (value == None):
+            if not value == "":
+                filtered_data.append(str(value))
+    return filtered_data
+
+
+    return list(read_ods(settings_path())[attribute])
 
 #Class for storing settings.
 class SettingsInfo():
-    def __init__(self, trials = read("trials")[0], iterations = read("iterations")[0], seconds = read("seconds")[0], wait_time = read("wait")[0], port = None, path = default_path(), subject = "no_subject"):
+    def __init__(self, trials = read_ods_attr("trials", True), 
+                iterations = read_ods_attr("iterations", True), 
+                seconds = read_ods_attr("seconds"), 
+                wait_time = read_ods_attr("wait"), 
+                port = None, 
+                path = default_path(), 
+                subject = "no_subject"):
+
         self.get = {
             "trials": trials,
             "iterations": iterations,

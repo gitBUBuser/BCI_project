@@ -128,7 +128,7 @@
                     ValEntry:
                         on_text: root.process_text_input(self)
                         name: 'trials'
-                        text: funcs.read_attribute_from_ods(self.name)
+                        text: funcs.read_ods_attr(self.name, True)
 
                 ErrorLabel:
                     visible: not root.value_corrs['trials']
@@ -148,7 +148,7 @@
                     ValEntry:
                         on_text: root.process_text_input(self)
                         name: 'iterations'
-                        text: funcs.read_attribute_from_ods(self.name)
+                        text: funcs.read_ods_attr(self.name, True)
 
                 ErrorLabel:
                     visible: not root.value_corrs['iterations']
@@ -169,8 +169,7 @@
                     ValEntry:
                         on_text: root.process_text_input(self)
                         name: 'seconds'
-                        text: funcs.read_attribute_from_ods(self.name)
-
+                        text: funcs.read_ods_attr(self.name, True)
                 ErrorLabel:
                     visible: not root.value_corrs['seconds']
 
@@ -188,7 +187,7 @@
                     ValEntry:
                         on_text: root.process_text_input(self)
                         name: 'wait'
-                        text: funcs.read_attribute_from_ods(self.name)
+                        text: funcs.read_ods_attr(self.name, True)
                 ErrorLabel:
                     visible: not root.value_corrs['wait']
                 

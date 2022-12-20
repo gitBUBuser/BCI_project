@@ -15,12 +15,14 @@ import Code.eeg_trainer_functions as funcs
 
 
 class EEG_Reader:
-    def __init__(self, port, baud_rate = funcs.read_attribute_from_ods("baud_rate"),
-                 frequency = funcs.read_attribute_from_ods("frequency"), 
-                 timeout = funcs.read_attribute_from_ods("time_out"),
-                 channels = funcs.read("channels")):
+    def __init__(self, port, 
+                baud_rate = float(funcs.read_ods_attr("baud_rate")),
+                frequency = float(funcs.read_ods_attr("frequency")), 
+                timeout = float(funcs.read_ods_attr("time_out")),
+                channels = funcs.read("channels")):
 
         self.channels = channels
+        print(channels)
         self.port = port
         self.frequency = frequency
         self.baud_rate = baud_rate
@@ -164,6 +166,22 @@ class EEG_Reader:
             self.input_buffer = reading.copy()
             self.handle_data(reading)
 
+class Counter(object):
+    def __init__(self, initval = 0):
+        self.val = multiprocessing.Value('i', initval)
+        self.lock = multiprocessing.Lock()
+
+    def increment(self, value):
+        with self.lock:
+            self.val.value += value
+    
+    def value(self):
+        with self.lock:
+            return self.val.value
+
+    
+
+
 class EEG_recorder:
     def __init__(self, port, path = os.getcwd(), record_from_start = False):
 
@@ -172,7 +190,8 @@ class EEG_recorder:
         self.epochs = multiprocessing.Queue()
         self.recording = multiprocessing.Event()
         self.latest = multiprocessing.Queue()
-        
+        self.sample_counter = Counter(0)
+
         self.path = path
 
         if record_from_start:
@@ -191,69 +210,112 @@ class EEG_recorder:
         buffer = self.reader.get_data()
 
         if len(buffer) > 0:
+            self.sample_counter.increment(len(buffer))
             self.latest.put(buffer)
 
         if self.recording.is_set():
             if len(buffer) > 0:
                 self.q.put(buffer)
-            
+
+
     def get_latest(self):
         latest_list = []
         while (self.latest.qsize() > 0):
             latest_list.append(self.latest.get())
-        flat = [item for sub_list in data for item in sub_list]
+        flat = [item for sub_list in latest_list for item in sub_list]
         return flat
 
     def get_recording_q(self):
         q_list = []
         while(self.q.qsize() > 0):
             q_list.append(self.q.get())
-        return [item for sub_list in q_list for item in sub_list]
+        flat = [item for sub_list in q_list for item in sub_list]
+        return flat
 
     def get_epochs_annotations(self):
-        epochs = []
+        epoch_dict = {}
+
+        def channels_list_to_string(channels):
+            return ','.join(channels)
+        
+        def channels_string_to_list(channels):
+            return channels.split(",")
+
+        def add_to_dict(epoch):
+            epoch_tag = epoch[0]
+            epoch_onset = epoch[1]
+            channels = channels_list_to_string(epoch[2])
+
+            if channels in epoch_dict:
+                epoch_dict[channels].append([epoch_tag, epoch_onset])
+            else:
+                epoch_dict[channels] = [[epoch_tag, epoch_onset]]
+
+    
 
         while(self.epochs.qsize() > 0):
-            epochs.append(self.epochs.get())
+            epoch = self.epochs.get()
+            add_to_dict(epoch)
 
         epochs_w_durations = []
-        for i in range(len(epochs)):
-            if epochs[i].startsWith("stop"):
-                continue
 
-            epoch_tag = epochs[i][0]
-            duration = 0
-            for j in range(i, len(epochs)):
-                next_epoch_tag = epochs[j][0]
-                if next_epoch_tag == f"stop {epoch_tag}":
-                    duration = float(epochs[j][1]) - float(epochs[i][1])
-                    break
+        for channels in epoch_dict.keys():
+            for i in range(len(epoch_dict[channels])):
+                epoch_tag = epoch_dict[channels][i][0]
+                epoch_onset = float(epoch_dict[channels][i][1]) / self.reader.frequency
 
-            epochs_w_durations.append([epochs[i][0], float(epochs[i][1]), duration])
+                if epoch_tag.startswith("stop"):
+                    continue
 
+                duration = 0
+
+                for j in range(i, len(epoch_dict[channels])):
+                    next_epoch_tag = epoch_dict[channels][j][0]
+
+                    if next_epoch_tag == f"stop {epoch_tag}":
+                        epoch_end = float(epoch_dict[channels][j][1]) / self.reader.frequency
+                        duration = epoch_end - epoch_onset
+                        break
+            
+                epochs_w_durations.append([epoch_tag, epoch_onset, duration, np.array(channels_string_to_list(channels))])
+
+        print(epochs_w_durations)
         epochs_T = np.array(epochs_w_durations).T
-        return mne.Annotations(epochs_T[1], epochs_T[2], epochs_T[0])
+        print(epochs_T)
+        return mne.Annotations(epochs_T[1], epochs_T[2], epochs_T[0], ch_names=epochs_T[3])
 
 
     def stop_recording(self):
         self.recording.clear()
 
-    def start_epoch(self, time, tag):
-        self.epochs.put(([tag, time]))
+    def start_epoch(self, tag, channels = [""]):
+        if channels == [""]:
+            channels = self.reader.channels
+        
+        current_sample = self.sample_counter.value()
+        self.epochs.put(([tag, current_sample, channels]))
 
-    def end_epoch(self, time, tag):
-        self.epochs.put([f"stop {tag}", time])
+    def end_epoch(self, tag, channels = [""]):
+        if channels == [""]:
+            channels = self.reader.channels
+        current_sample = self.sample_counter.value()
+        self.epochs.put([f"stop {tag}", current_sample, channels])
 
     def save_file(self, file_name):
         self.stop_recording()
-
         q_list = self.get_recording_q()
         annotations = self.get_epochs_annotations()
+        print(annotations)
 
         save_info = np.reshape(q_list, (self.reader.n_channels, -1))
-        info = mne.create_info(self.reader.channels, self.reader.frequency)
+        info = mne.create_info(self.reader.channels, self.reader.frequency, ch_types="eeg")
 
-        raw_data = mne.io.RawArray(save_info, info)
+        raw_data = mne.io.RawArray(save_info, info, copy="both")
+        print(raw_data.get_data())
+        raw_data.preload = True
+        print("test")
+        print(raw_data.times)
+        print("test")
         raw_data.set_annotations(annotations)
 
         path = os.path.join(self.path, str(file_name))

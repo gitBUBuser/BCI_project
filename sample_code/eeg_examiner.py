@@ -12,47 +12,50 @@ from os.path import isfile, join
 from scipy.signal import spectrogram
 from scipy.signal import hilbert
 
-path = "/home/baserad/Documents/Schoolwork/NDL/BCI_project/eeg_reader/EEG_Trainer/Data"
+path = "/home/baserad/Documents/Schoolwork/NDL/BCI_project/eeg_reader/EEG_Trainer/Data/Sven_training.edf"
 processor = preprocessing.EEG_processer()
-onlyfiles = [f for f in listdir(path) if isfile(join(path, f))]
-print(onlyfiles)
+
+
 eeg_training_data = []
-low, hi = 0.2, 64
-ideal_sample_rate = 128
+low, hi = 0.25, 45
+ideal_sample_rate = 125
 
 
 new_ch_names = []
 
-for a_file in onlyfiles:
-    new_ch_names.append(a_file)
-    eeg_training_data.append(mne.io.read_raw_edf(join(path, a_file)))
+raw_data = mne.io.read_raw_edf(path, preload=True)
+raw_data.filter(low, hi)
+raw_data.resample(ideal_sample_rate)
 
 
-for a_file in eeg_training_data:
-    a_file.load_data()
+# Extract the annotations from the raw object
+annotations = raw_data.annotations
 
+# Create a matrix of events from the annotations
 
-for signal in eeg_training_data:
-    signal.filter(low, hi)
-    signal.notch_filter(np.arange(60, 240, 60))
-    signal.resample(ideal_sample_rate)
+events = mne.events_from_annotations(raw_data)
 
+event_ids = events[1]
 
-  
-#new_info.__setitem__(key, val)
-print("test")
-print(eeg_training_data)
+epochs = mne.Epochs(raw_data, events[0], detrend=1)
 
-eeg_array = np.array([data.get_data()[0] for data in eeg_training_data])
-new_info = mne.create_info(new_ch_names, ideal_sample_rate)
-added_signals = mne.io.RawArray(eeg_array, new_info)
-print(added_signals.info)
-data = added_signals.get_data()
 
 fig, ax = plt.subplots(figsize=(20,5))
 labels = []
 fouriers = []
 freq = []
+
+def compute_FFT(signal):
+    n = signal.size
+    time = n / ideal_sample_rate
+    ts = 1 / ideal_sample_rate
+
+    #tl = np.arange(0, time, ts)
+    FFT = abs(fft.fft(signal))[range(int(n/2))]
+    fouriers.append(FFT)
+    freq = np.array(fftpack.fftfreq(n, ts))[range(int(n/2))]
+
+    return FFT, freq
 
 def compute_average(ffts):
     ffts_T = np.array(ffts).T
@@ -66,7 +69,58 @@ def compute_average(ffts):
         average.append(avg)
 
     return np.array(average)
+
+FFTs = {}
+freqs = []
+
+epochs_by_annotations = {}
+
+def add_to_epochs_by_annotation(key, value):
+
+    if key in epochs_by_annotations.keys():
+        epochs_by_annotations[key].append(value)
+    else:
+        epochs_by_annotations[key] = value
+
+for key, value in event_ids.items():
+    print(key)
+    print(value)
+
+    selection = epochs[value]
+    for test in selection:
+        print(test)
         
+    print(selection)
+    print(epochs)
+
+
+
+for key, value in event_ids.items():
+
+    selected_epochs = epochs.__getitem__(value)
+    print(selected_epochs)
+    add_to_epochs_by_annotation(key, selected_epochs)
+
+    """inner_ffts = []
+    for e in selected_epochs:
+        ft, freqs = compute_FFT(e[0])
+        inner_ffts.append(ft)
+
+    FFTs[key] = compute_average(inner_ffts)"""
+
+"""for key, value in FFTs.items():
+    ax.plot(freqs, value, label=key)"""
+
+for key, value in epochs_by_annotations.items():
+    print(f"event: {key} || data: {value}")
+
+
+
+    
+
+
+"""
+
 
 defaults_FFT = []
 left_left_FFT = []
@@ -173,7 +227,7 @@ plt.show()
 #added_signals[1].plot_psd(average=False, color="red", spatial_colors=False)
 
 
-"""
+
 # preprocessing stuff with the signal
 
 signal.filter(low, hi)
@@ -212,4 +266,5 @@ signal.resample(128)
 signal.plot()
 
 plt.show()
+
 """
