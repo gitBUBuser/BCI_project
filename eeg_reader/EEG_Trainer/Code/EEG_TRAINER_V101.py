@@ -86,6 +86,7 @@ class EEGTrainer(Screen):
         #Timer variables.
         self.iteration_timer = 0
         self.wait_timer = 0
+        self.original_wait_timer = 0
         self.run_time = 0
          #Variables corresponding to stage of training
         self.current_trial = 1
@@ -131,6 +132,8 @@ class EEGTrainer(Screen):
         self.iterations = int(settings.get["iterations"])
         self.iteration_time = float(settings.get["seconds"])
         self.wait_time = float(settings.get["wait"])
+        self.original_wait_time = self.wait_time
+        self.start_wait_time = self.wait_time + 10
         
         recorder = EEG.EEG_recorder(self.port, self.path, record_from_start=True)
         recorder.start_recording()
@@ -219,6 +222,11 @@ class EEGTrainer(Screen):
         self.run_time += nand
         self.graph_plot()
         
+        if self.just_started:
+            self.wait_time = self.start_wait_time
+        else:
+            self.wait_time = self.original_wait_time
+
         if self.wait_timer > self.wait_time:
             self.target_condition = True
             self.movement_just_started = True
