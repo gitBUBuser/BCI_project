@@ -1,34 +1,24 @@
 import os
-from directkeys import PressKey, ReleaseKey, LEFT, RIGHT, ENTER, SPACE
+from pynput.keyboard import Key, Controller
 import time
 
-def startGame():
-    os.startfile(os.getcwd() + "\\invaders\\invaders.exe")
-    time.sleep(1)
-    PressKey(ENTER)
-    ReleaseKey(ENTER)
-    time.sleep(1)
+class Game():
+    def __init__():
+        self.keyboard = Controller()
+        os.startfile(os.getcwd() + "\\invaders\\invaders.exe")
+        time.sleep(1)
+        self.keyboard.press('ENTER')
+        time.sleep(1)
+        self.keyboard.release('ENTER')
 
-    PressKey(SPACE)
-    #read EEG, run algorithm and call move functions
-
-def doNothing():
-    ReleaseKey(LEFT)
-    ReleaseKey(RIGHT)
-
-def goLeft():
-    ReleaseKey(RIGHT)
-    PressKey(LEFT)
-
-def goRight():
-    ReleaseKey(LEFT)
-    PressKey(RIGHT)
-
-#def startShooting():
-#    PressKey(SPACE)
-
-#def stopShooting():
-#    ReleaseKey(SPACE)
-
-if __name__ == "__main__":
-    startGame()
+    def doNothing(self):
+        self.keyboard.release('LEFT')
+        self.keyboard.release('RIGHT')
+    
+    def goLeft(self):
+        self.keyboard.release('RIGHT')
+        self.keyboard.press('LEFT')
+    
+    def goRight(self):
+        self.keyboard.release('LEFT')
+        self.keyboard.press('RIGHT')

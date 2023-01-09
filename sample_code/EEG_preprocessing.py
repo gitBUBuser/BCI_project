@@ -8,138 +8,209 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import operator
 import scipy.linalg as la
+import sklearn as sk
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from scipy.signal import resample
+from scipy.signal import butter
+from scipy.signal import sosfilt
 
 path = "/home/baserad/Documents/Schoolwork/NDL/BCI_project/eeg_reader/EEG_Trainer/Min_lilla_hjärna.edf"
 low, hi = 2, 30
-ideal_sample_rate = 100
 
-class Preprocessor():
-    def __init__(self):
-        pass
+class BlankObj:
+  def __repr__(self):
+   return ""
+
+class DataHandler():
+    def __init__(self, filter_band, sampling_rate):
+        self.ts_data = []
+        self.label_names = []
+
+        self.filter_band = filter_band
+        self.sampling_rate = sampling_rate
+
+        self.sos = butter(4, self.filter_band, btype="bandpass", output="sos", fs=10000)
+
+    def load_file(self, path):
+
+        raw = mne.io.read_raw_edf(path, preload=True)
+        raw.filter(self.filter_band[0], self.filter_band[1])
+        raw.resample(self.sampling_rate)
+
+        event_ids, epochs = self.raw_to_epochs(raw)
+        self.epochs_to_signals(epochs, event_ids)
+        print(self.ts_data)
+
+    def load_array(self, X, y = None):
+        X = np.array(X)
+        if y != None:
+            self.ts_data.append([X, y])
+        else:
+            self.ts_data.append([X, BlankObj()])
+
+    def filter_and_resample(self, X):
+        X = np.array(X)
+        filtered_X = sosfilt(self.sos, x)
+        return resample(filtered_X, self.sampling_rate)
+
+    def set_signal(self, X, y = None):
+        X = np.array(X)
+        if y == None:
+            self.ts_data = [[X], BlankObj()]
+        else:
+            self.ts_data = [[X], y]
+
+    def load_and_filter_array(self, X, y = None):
+        X = np.array(X)
+        filtered_X = sosfilt(self.sos, X)
+        X = resample(filtered_X, self.sampling_rate)
+        if y != None:
+            self.ts_data.append([filtered_X, y])
+        else:
+            self.ts_data.append([filtered_X, BlankObj()])
+
+    def clear_data(self):
+        self.ts_data.clear()
     
-    def get_event_ids_from_raw_edf(self, data):
-        return mne.events_from_annotations(raw_data, verbose=True)[1]
+    def classes(self):
+        return [signal[1] for signal in self.ts_data]
 
-    def get_epoch_dict_from_edf_path(self, path, sample_rate, low, hi):
-        raw_data = mne.io.read_raw_edf(path, preload=True)
+    def epochs_to_signals(self, epochs, event_ids):
+        for name, id in event_ids.items():
+            class_id = id - 1
+            self.label_names.append(name)
+            signals = epochs.__getitem__(str(id))
+            for signal in signals:
+                self.load_array(signal[0], class_id)
 
-        raw_data.filter(low, hi)
+    def no_outlier_indeces(self, data, m = 4.):
+        index_array = np.arange(0, len(data), 1)
+        median = np.median(data)
+        MAD = np.median([abs(data_point-median) for data_point in data])
+        return index_array[abs(data - median) < m * MAD]
 
-        sfreq = raw_data.info["sfreq"]
-
-        if sfreq != sample_rate:
-            raw_data.resample(ideal_sample_rate)
-        
-        events, event_ids, epochs = self.raw_edf_to_epochs(raw_data)
-        return self.epochs_to_dict(epochs, event_ids)
-
-
-    def raw_edf_to_epochs(self, raw):
-        def no_outlier_indeces(data, m = 4.):
-            index_array = np.arange(0, len(data), 1)
-
-            median = np.median(data)
-            MAD = np.median([abs(data_point-median) for data_point in data])
-            return index_array[abs(data - median) < m * MAD]
-
-       
+    def raw_to_epochs(self, raw):
         durations = raw.annotations.duration
         mean_duration = np.mean(durations)
-
-        ham_indeces = no_outlier_indeces(durations)
-
+        ham_indeces = self.no_outlier_indeces(durations)
         events, event_ids = mne.events_from_annotations(raw, verbose=True)
         events = events[ham_indeces]
-        return events, event_ids, mne.Epochs(raw, events, preload=True, tmax=mean_duration)
+        return event_ids, mne.Epochs(raw, events, preload=True, tmin=0, tmax=mean_duration, baseline=None)
 
-    def compute_FFT(self, signal):
-        n = signal.size
-        time = n / ideal_sample_rate
-        ts = 1 / ideal_sample_rate
+    def get_FFTs(self):
+        FFTs = []
+        freqs = []
+        labels = []
 
-        #tl = np.arange(0, time, ts)
-        FFT = abs(fft.fft(signal))[range(int(n/2))]
-        freq = np.array(fftpack.fftfreq(n, ts))[range(int(n/2))]
+        for data in self.ts_data:
+            X = data[0]
+            labels.append(data[1])
 
-        return FFT, freq
+            n = X.size
+            time = n / self.sampling_rate
+            ts = 1 / self.sampling_rate
 
-    def epochs_to_dict(self, epochs, event_ids):
-        epoch_dict = {}
-        for key, value in event_ids.items():
-            signals = epochs.__getitem__(str(value))
-            epoch_dict[key] = signals
-        return epoch_dict
-    
-    def dict_to_labeled_data(self):
-        pass
-
-    def compute_average_timeseries(self, time_series):
-        avg_t_s = []
-        t_series = np.array(time_series)
-        t_series_shape = t_series.shape
-
-        for i in range(t_series_shape[1]):
-            avg = 0
-            for j in range(t_series_shape[0]):
-                avg += time_series[j][i]
-            avg_t_s.append(avg)
-    
-        return np.array(avg_t_s)
-
-    def ffts_from_dict(self, epoch_dict):
-        fft_dict = {}
-        for key in epoch_dict.keys():
-            signals = epoch_dict[key]
-            fft_signals = []
-            for signal in signals:
-                for channel_signal in signal:
-                    fft_signals.append(self.compute_FFT(channel_signal))
-            fft_dict[key] = fft_signals
-        return fft_dict
-
-    def average_dict_series(self, epoch_dict, average_index):
-        new_dict = {}
-        for key in epoch_dict.keys():
-            signals = epoch_dict[key]
-            new_signals = []
-            for i in range(0, len(signals), average_index):
-                inner_signals = []
-                for j in range(i, i + average_index):
-                    if j < len(signals):
-                        inner_signals.append(signals[j])
-                    else: 
-                        continue
-   
-                new_signals.append(self.compute_average_timeseries(inner_signals))
-            new_dict[key] = np.array(new_signals)
-        return new_dict
-
-
+            FFT = abs(fft.fft(signal))[range(int(n/2))]
+            freq = np.array(fftpack.fftfreq(n, ts))[range(int(n/2))]
+            FFTs.append(FFT)
+            freqs.append(freq)
         
+        return FFTs, freqs, labels
     
+    def compute_average_timeseries(self, id = None, interval = 1):
+        signals = np.array(self.ts_data)
+        t_signals = signals.T
+        label_count = len(self.label_names)
+        new_labels = []
+        mean_signals = []
+        for i in range(label_count):
+            
+            labeled_signals = np.array([signal[0] for signal in signals if signal[1] == i])
+            label = i
+            step = interval
+            avg_signals = {}
+
+            for z in range(0, labeled_signals.shape[0], step):
+                avg_signals[z] = []
+
+            for a in range(0, labeled_signals.shape[1]):
+                for b in range(0, labeled_signals.shape[0], step):
+                    index = b
+                    avg = 0
+                    if b + step <= labeled_signals.shape[0]:
+                        for c in range(b, b + step):
+                            avg += labeled_signals[c][i]
+                        avg_signals[index].append(avg / step)
+                    else:
+                        pass
+            
+
+            for index, value in avg_signals.items():
+                if value != []:
+                    mean_signals.append(value)
+                    new_labels.append(i)
+
+        self.clear_data()
+        for y in range(len(mean_signals)):
+            self.load_array(mean_signals[y], new_labels[y])
+
+    def average_series(self, series, labels = None, interval = 1):
+        series = np.array(series)
+
+        new_labels = []
+        mean_series = []
+        
+        if labels != None:
+            label_count = len(list(dict.fromkeys(labels)))
+            for i in range(label_count):
+                avg_series = {}
+
+                for z in range(0, series.shape[0], interval):
+                        avg_series[z] = []
+
+                for a in range(0, series.shape[1]):
+                    for b in range(0, series.shape[0], interval):
+                        index = b
+                        avg = 0
+                        if b + interval <= series.shape[0]:
+                            for c in range(b, b + interval):
+                                avg += series[c][i]
+                            avg_series[index].append(avg / interval)
+                        else:
+                            pass
+            
+                for index, value in avg_series.items():
+                    if value != []:
+                        mean_series.append(value)
+                        new_labels.append(i)
+        else:
+            pass
+
+        return mean_series, new_labels
+
+    def get_bands(self, low, hi, amount):
+        difference = hi - low
+        step = difference / amount
+        bands = []
+        for i in np.arange(low, hi, step):
+            bands.append((i, i+step))
+        return bands
+
+    def bandpowers(self, bands):
+        bp_signals = []
+        labels = []
+
+        for signal in self.ts_data:
+            signal_bps = []
+            labels.append(signal[1])
+            for band in bands:
+                signal_bps.append(self.bandpower(signal[0], self.sampling_rate, band)) 
+            bp_signals.append(signal_bps)
+
+        return bp_signals, labels       
+
+
     def bandpower(self, signal, sf, band):
-        """Compute the average power of the signal x in a specific frequency band.
-
-        Parameters
-        ----------
-        data : 1d-array
-            Input signal in the time-domain.
-        sf : float
-            Sampling frequency of the data.
-        band : list
-            Lower and upper frequencies of the band of interest.
-        window_sec : float
-            Length of each window in seconds.
-            If None, window_sec = (1 / min(band)) * 2
-        relative : boolean
-            If True, return the relative power (= divided by the total power of the signal).
-            If False (default), return the absolute power.
-
-        Return
-        ------
-        bp : float
-            Absolute or relative band power.
-        """
         band = np.asarray(band)
         low, hi= band
 
@@ -149,21 +220,42 @@ class Preprocessor():
             ind_max = np.argmax(f > hi) - 1
             return np.trapz(Pxx[ind_min: ind_max], f[ind_min: ind_max])
 
-        bps = []
-        for ch in signal:
-            bps.append(get_bandpower(ch))
+        bps = get_bandpower(signal)
         return bps
 
-        def std_per_band(self, epoch_dict):
-            std_bands = {}
-            for key in epoch_dict.keys():
-                std_bands[key] = np.std(epoch_dict[key])
+    def std_per_band(self, epoch_dict):
+        std_bands = {}
+        for key in epoch_dict.keys():
+            std_bands[key] = np.std(epoch_dict[key])
+
+    def segment(self, time_per_segment):
+        segmented_signals = []
+        labels = []
+        for signal in self.ts_data:
+            y = signal[1]
+            X = signal[0]
+            samples = len(X)
+            samples_per_segment = time_per_segment * self.sampling_rate
+            for i in np.arange(0, samples, samples_per_segment):
+                if int(i + samples_per_segment) <= samples:
+                    segmented_signals.append(X[int(i):int(i + samples_per_segment)])
+                    labels.append(y)
+        self.clear_data()
+
+        for j in range(len(segmented_signals)):
+            if segmented_signals[j] != []:
+                self.load_array(segmented_signals[j], labels[j])
+            else:
+                print("error")
+
+            
+
 
     def get_best_filter_bands(self, cov1, cov2, amount = 1, every_other = False):
         average_cov = cov1 + cov2
         D, V = la.eig(cov1, average_cov)
 
-        D_sort = np.argsort(D)
+        D_sort = np.argsort(D)[::-1]
         D = D[D_sort]
         V = V[D_sort]
 
@@ -177,6 +269,7 @@ class Preprocessor():
             positive_index = 0
             negative_index = -1
             positive_turn = True
+
             while index < amount:
                 index += 1
 
@@ -192,196 +285,13 @@ class Preprocessor():
                     negative_index -= 1
 
             return (new_d, new_v)
-                
 
-if __name__ == "__main__":
-    preprocessor = Preprocessor()
-    epoch_dict = preprocessor.get_epoch_dict_from_edf_path(path, 240, 0.5, 40)
+    def __str__(self):
+        return f"Labels: {self.label_names}\nBand: {self.filter_band}\nSampling rate: {self.sampling_rate}\nClasses: {self.classes()}\nSignals: {np.array(self.ts_data, dtype=object).shape[0]}"
 
-    frequency_bands = 10
-
-    center_function = lambda x: x - x.mean()
-    test_bands = []
-    random.seed()  
-    lowest_frequency = 2
-    highest_frequency = 35
-    difference = highest_frequency - lowest_frequency
-    add_amount = difference / frequency_bands
-
-    highs = np.arange(lowest_frequency + add_amount, highest_frequency + add_amount, add_amount)
-    lows = np.arange(lowest_frequency, highest_frequency, add_amount)
-
-    for i in range(len(highs)):
-        test_bands.append((lows[i], highs[i]))
-
-        
-
-    for key in epoch_dict.keys():
-        new_values = []
-        for value in epoch_dict[key]:
-            inner_band_values = []
-            for band in test_bands:
-                inner_band_values.append(np.log(preprocessor.bandpower(value, 240, band)))
-            new_values.append(inner_band_values)
-        epoch_dict[key] = np.array(new_values)
-
-    epoch_dict = preprocessor.average_dict_series(epoch_dict, )
-
-    happy = epoch_dict["think of being happy"]
-    happy = np.array(happy.T[0].T)
-    right = epoch_dict["right hand right"]
-    right = np.array(right.T[0].T)
-
-    happy_t = happy.T
-    right_t = right.T
-    happy_covariance = np.cov(center_function(happy_t))
-    right_covariance = np.cov(center_function(right_t))
-
-    d, v = preprocessor.get_best_filter_bands(happy_covariance, right_covariance, amount=10, every_other=True)
-    print(d)
-    right_in_dir = []
-    happy_in_dir = []
-    print(happy.shape)
-
-
-    avg_happy = preprocessor.compute_average_timeseries(happy)
-    avg_right = preprocessor.compute_average_timeseries(right)
-    
-    plt.plot(avg_right, label = "right")
-    plt.plot(avg_happy, label = "happy")
-    plt.title("average bandpower of 11 trials")
-    plt.legend()
-    plt.show()
-
-    new_happy_vals = []
-    new_x = []
-    new_right_vals = []
-
-
-
-    for i in range(len(d)):
-        avg_happy_new = np.dot(v[i], happy_t)
-        avg_right_new = np.dot(v[i], right_t)
-        new_x.append(np.ones(len(avg_right_new)) * i)
-        difference = np.abs(np.var(avg_happy_new)) - np.abs(np.var(avg_right_new))
-        other_way = np.abs(np.var(avg_right_new)) - np.abs(np.var(avg_happy_new))
-        print(str(difference) + "       " + str(other_way))
-        new_happy_vals.append(avg_happy_new)
-        new_right_vals.append(avg_right_new)
-
-    plt.axhline(y = 0, color = 'r', linestyle = '--', label="proposed_decision_boundary")
-    plt.title("'power' of trial projected onto eigenvector of frequencybands with most variation")
-    plt.scatter(new_x, new_happy_vals, label = "happy")
-    plt.scatter(new_x, new_right_vals, label = "right")
-    plt.legend()
-    plt.show()
-    
-    plt.scatter(new_happy_vals[2], new_happy_vals[1])
-    plt.scatter(new_right_vals[2], new_right_vals[1])
-    plt.show()
-
-    """for i in range(len(d)):
-        avg_happy_new = np.dot(v[i], happy_t)
-        avg_right_new = np.dot(v[i], right_t)
-        right_tl = np.ones(len(avg_right_new)) * i
-        happy_tl = np.ones(len(avg_happy_new)) * i
-
-        plt.scatter(right_tl, avg_right_new, label = "right")
-        plt.scatter(happy_tl, avg_happy_new, label = "happy")
-
-    plt.title("average bandpower of 11 trials")
-    plt.legend()
-    plt.show()
-
-    """
-
-    """
-    for i in range(len(d)):
-
-
-
-    for i in range(len(d)):
-        print(v[i])
-        happy_in_dir.append(np.dot(happy, v[i]))
-        right_in_dir.append(np.dot(right, v[i]))
-    
-
-    plt.scatter(happy_in_dir[0], happy_in_dir[1], label = "happy")
-    plt.scatter(right_in_dir[0],  right_in_dir[1], label = "right")
-    plt.legend()
-    plt.show()
-"""
-"""
-    std_per_band_happy = {}
-    std_per_band_right = {}
-
-    for i in range(len(test_bands)):
-        std_per_band_happy[str(test_bands[i])] = np.std(happy_t[i])
-        std_per_band_right[str(test_bands[i])] = np.std(right_t[i])
-    
-    sorted_band_right = dict(sorted(std_per_band_right.items(), key=operator.itemgetter(1)))
-    sorted_band_happy = dict(sorted(std_per_band_happy.items(), key=operator.itemgetter(1)))
-
-
-
-    fig, ax = plt.subplots(ncols = 2, sharey=True, figsize=(19, 15))
-    ax[0].bar(np.arange(len(sorted_band_happy)), sorted_band_happy.values(), label=sorted_band_happy.keys())
-    ax[0].title.set_text("STDs think of being happy")
-    ax[0].set_ylabel("STD [µV]")
-    ax[0].set_xlabel("bands")
-    ax[0].set_xticklabels(ax[0].get_xticks(), rotation = 60)
-    ax[0].set_xticklabels(sorted_band_happy.keys())
-
-    ax[1].bar(np.arange(len(sorted_band_right)), sorted_band_right.values(), label=sorted_band_right.keys())
-    ax[1].set_ylabel("STD [µV]")
-    ax[1].title.set_text("STDs think of moving hand to the right")
-    ax[1].set_xlabel("bands")
-    ax[1].set_xticklabels(ax[1].get_xticks(), rotation = 60)
-    ax[1].set_xticklabels(sorted_band_right.keys())
-
-    plt.show()
-
-    
-
-
-
-    happy_frame = pd.DataFrame(happy)
-    right_frame = pd.DataFrame(right)
-
-    fig, ax = plt.subplots(ncols = 2, figsize=(19, 15), sharey= True)   
-
-    ax[0].title.set_text("correlation think of being happy")
-    ax[0].matshow(happy_frame.corr())
-    ax[0].set_xticklabels([''] + test_bands)
-    ax[0].set_yticklabels([''] + test_bands)
-
-    ax[1].title.set_text("correlation right hand right")
-    mat = ax[1].matshow(right_frame.corr())
-    ax[1].set_xticklabels([''] + test_bands)
-    ax[1].set_yticklabels([''] + test_bands)
-
-    fig.subplots_adjust(right=0.8)
-    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-
-    fig.colorbar(mat, cax=cbar_ax)
-   
-   
-    plt.show()"""
-    #cov_happy = np.cov(happy)
-    #cov_right = np.cov(right)
-
-    #print(cov_happy)
-    #covarience = np.cov()
-
-
-
-
-
-
-    
-
-
-
+    def print_signals(self):
+        for signal in self.ts_data:
+            print(f"Label: '{signal[1]}'   |   > {signal[0]}")
 
 
 

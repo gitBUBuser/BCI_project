@@ -156,7 +156,6 @@ class EEG_Reader:
                 if self.cBufTail == len(self.input_buffer):
                     have_data = False
                     break
-                
     def read_from_port(self):
         reading = self.get_serial().read(1024)
         if(len(reading)>0):
@@ -165,6 +164,28 @@ class EEG_Reader:
             #should be changed             
             self.input_buffer = reading.copy()
             self.handle_data(reading)
+
+class LiveEEGRecorder:
+    def __init__(self, port):
+        self.reader = EEG_Reader(port)
+        self.q = multiprocessing.Queue()
+
+    def update(self):
+        time.sleep(self.reader.timeout)
+        self.reader.reset_buffer()
+        self.reader.read_from_port()
+        buffer = self.reader.get_data()
+        if len(buffer) > 0:
+            self.q.put(buffer)
+    
+    def get_latest(self):
+        latest_list = []
+        while (self.q.qsize() > 0):
+            latest_list.append(self.q.get())
+        flat = [item for sub_list in latest_list for item in sub_list]
+        return flat
+        
+
 
 class Counter(object):
     def __init__(self, initval = 0):
@@ -178,10 +199,7 @@ class Counter(object):
     def value(self):
         with self.lock:
             return self.val.value
-
-    
-
-
+        
 class EEG_recorder:
     def __init__(self, port, path = os.getcwd(), record_from_start = False):
 
@@ -325,28 +343,6 @@ class EEG_recorder:
 
         mne.export.export_raw(path + ".edf", raw_data, fmt="edf")
 
-# Class for preprocessing EEG signals.
-class EEG_processer:
-    def __init__(self):
-        self.filter_band = (1.5, 16)
-        self.inteval = (-0.1, 0)
-
-
-    def bandpass_filter_MNE(self, some_data):
-        return some_data.filter(self.filter_band[0], self.filter_band[1], method="icir")
-
-    def preprocessed_to_epoch(self, preprocessed_data, decimate=10, baseline_ival=(-.2, 0)):
-        class_ids = { "Left": 1, "Right": 2, "StartShoot": 3, "StopShoot": 4}
-
-        events = mne.events_from_annotations(preprocessed_data, event_id=class_ids)[0]
-        epo_data = mne.Epochs(preprocessed_data, events, event_id=class_ids,
-                              baseline=baseline_ival, decim=decimate,
-                              reject=reject, proj=False, preload=True)
-        return epo_data
-
-    def correct_for_drift(self, some_data):
-        some_data.apply_baseline(self.inteval)
-        
 
 
 

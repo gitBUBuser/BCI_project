@@ -260,8 +260,3 @@ class EEGTrainer(Screen):
             self.update_labels()
             self.instructions_on_wait()
            
-
-#Updates the EEG recorder
-def update_recorder():
-    while(True):
-        recorder.update()
