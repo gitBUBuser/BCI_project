@@ -1,5 +1,3 @@
-from scipy.signal import welch
-from scipy.integrate import simps
 import mne
 import numpy as np
 import random
@@ -13,6 +11,8 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from scipy.signal import resample
 from scipy.signal import butter
 from scipy.signal import sosfilt
+import random
+from scipy.signal import detrend
 
 """
     This file includes the central features we use to preprocess EEG signals before they can be used for classification.
@@ -52,17 +52,20 @@ class DataHandler():
         else:
             self.ts_data.append([X, BlankObj()])
 
-    def filter_and_resample(self, X):
+    def filter_and_resample(self, X, seconds):
         X = np.array(X)
-        filtered_X = sosfilt(self.sos, x)
-        return resample(filtered_X, self.sampling_rate)
+        filtered_X = sosfilt(self.sos, X)
+        return resample(filtered_X, self.sampling_rate * seconds)
 
     def set_signal(self, X, y = None):
         X = np.array(X)
         if y == None:
-            self.ts_data = [[X], BlankObj()]
+            self.ts_data = [[X, BlankObj()]]
         else:
-            self.ts_data = [[X], y]
+            self.ts_data = [[X, y]]
+
+    def overwrite_signal(self, data):
+        self.ts_data = data
 
     def load_and_filter_array(self, X, y = None):
         X = np.array(X)
@@ -100,6 +103,18 @@ class DataHandler():
         events, event_ids = mne.events_from_annotations(raw, verbose=True)
         events = events[ham_indeces]
         return event_ids, mne.Epochs(raw, events, preload=True, tmin=0, tmax=mean_duration, baseline=None)
+
+    def detrend(self):
+        new_data = []
+        for signal in self.ts_data:
+            labaled_signal = signal[0]
+            detrended_signal = detrend(labaled_signal)
+            new_data.append([detrended_signal, signal[1]])
+        self.overwrite_signal(new_data)
+
+        
+
+
 
     def get_FFTs(self):
         FFTs = []
@@ -158,39 +173,74 @@ class DataHandler():
         for y in range(len(mean_signals)):
             self.load_array(mean_signals[y], new_labels[y])
 
-    def average_series(self, series, labels = None, interval = 1):
-        series = np.array(series)
-
-        new_labels = []
-        mean_series = []
-        
+    def average_series(self, series, labels = None, interval = 1, shuffle = False):
         if labels != None:
+            signals_by_label = []
+            averaged_signals = []
             label_count = len(list(dict.fromkeys(labels)))
-            for i in range(label_count):
+    
+            for a in range(label_count):
+                signals_by_label.append([])
+                labels_indexes = [index for index in range(0, len(labels)) if labels[index] == a]
+                for index in labels_indexes:
+                    signals_by_label[a].append(series[index])
+
+            if shuffle:
+                for i in range(len(signals_by_label)):
+                    random.shuffle(signals_by_label[i])
+            for z in range(len(signals_by_label)):
+                signals = signals_by_label[z]
+                t_steps = int(len(signals) / interval)
                 avg_series = {}
 
-                for z in range(0, series.shape[0], interval):
-                        avg_series[z] = []
-
-                for a in range(0, series.shape[1]):
-                    for b in range(0, series.shape[0], interval):
-                        index = b
-                        avg = 0
-                        if b + interval <= series.shape[0]:
-                            for c in range(b, b + interval):
-                                avg += series[c][i]
-                            avg_series[index].append(avg / interval)
-                        else:
-                            pass
+                for indexus in range(t_steps):
+                    avg_series[indexus] = []
+                
+                for k in range(len(signals[0])):
             
-                for index, value in avg_series.items():
-                    if value != []:
-                        mean_series.append(value)
-                        new_labels.append(i)
-        else:
-            pass
+                    index = 0
+                    for j in range(0, len(signals), interval):
+                        avg = 0
+                        if j + interval <= len(signals):
+                            for c in range(j, j + interval):
+                                avg += signals[c][k]
+                            avg_series[index].append(avg / interval)
+                            index += 1
+                        else:
+                            continue
 
-        return mean_series, new_labels
+                for index, serie in avg_series.items():   
+                    averaged_signals.append([serie, z])
+
+            #print(averaged_signals)
+            return [signal[0] for signal in averaged_signals], [signal[1] for signal in averaged_signals]
+        else:
+            averaged_signals = []
+            signals = series
+            t_steps = int(len(signals) / interval)
+            avg_series = {}
+
+            for indexus in range(t_steps):
+                avg_series[indexus] = []
+
+            for k in range(len(signals[0])):
+            
+                index = 0
+                for j in range(0, len(signals), interval):
+                    avg = 0
+                    if j + interval <= len(signals):
+                        for c in range(j, j + interval):
+                            avg += signals[c][k]
+                        avg_series[index].append(avg / interval)
+                        index += 1
+                    else:
+                        continue
+
+            for index, serie in avg_series.items():   
+                averaged_signals.append([serie, BlankObj()])
+            return [signal[0] for signal in averaged_signals], [signal[1] for signal in averaged_signals]
+            
+            
 
     
     def get_bands(self, low, hi, amount):
@@ -212,18 +262,18 @@ class DataHandler():
                 signal_bps.append(self.bandpower(signal[0], self.sampling_rate, band)) 
             bp_signals.append(signal_bps)
 
-        return bp_signals, labels       
+        return bp_signals, labels     
 
 
     def bandpower(self, signal, sf, band):
+        signal = np.array(signal)
         band = np.asarray(band)
         low, hi= band
-
         def get_bandpower(signal):
             f, Pxx = scipy.signal.periodogram(signal, fs=sf)
             ind_min = np.argmax(f > low) - 1
             ind_max = np.argmax(f > hi) - 1
-            return np.trapz(Pxx[ind_min: ind_max], f[ind_min: ind_max])
+            return np.log(np.trapz(Pxx[ind_min: ind_max], f[ind_min: ind_max]))
 
         bps = get_bandpower(signal)
         return bps
@@ -254,7 +304,3 @@ class DataHandler():
     def print_signals(self):
         for signal in self.ts_data:
             print(f"Label: '{signal[1]}'   |   > {signal[0]}")
-
-
-
-

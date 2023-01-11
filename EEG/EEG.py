@@ -1,3 +1,7 @@
+import path
+import sys
+folder = path.Path(__file__).abspath()
+sys.path.append(folder.parent.parent)
 import numpy as np
 import serial
 import time
@@ -6,7 +10,7 @@ import scipy.io.wavfile as wav
 import multiprocessing
 import threading
 import mne 
-import Code.eeg_trainer_functions as funcs
+import EEG.EEG_Trainer.Code.eeg_trainer_functions as funcs
 
 """
     EEG.py. The classes within this file is central for the entire project.

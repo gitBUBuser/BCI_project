@@ -2,10 +2,8 @@ import os
 import re
 import subprocess
 from pandas_ods_reader import read_ods
-
 from kivy.uix.widget import Widget
 from kivy.graphics import Line, Color
-
 from kivy.properties import ReferenceListProperty
 from kivy.properties import NumericProperty
 from kivy.properties import ObjectProperty
@@ -19,13 +17,14 @@ from serial.tools import list_ports
 """
 
 def settings_path():
-    return "/home/baserad/Documents/Schoolwork/NDL/BCI_project/eeg_reader/EEG_Trainer/default_settings.ods"
+    return "/home/baserad/Documents/Schoolwork/NDL/BCI_project/EEG/EEG_Trainer/default_settings.ods"
 
 def graphics_dir():
-    return "/home/baserad/Documents/Schoolwork/NDL/BCI_project/eeg_reader/EEG_Trainer/Graphics"
+    return "/home/baserad/Documents/Schoolwork/NDL/BCI_project/EEG/EEG_Trainer/Graphics"
 
 def save_dir():
-    return "/home/baserad/Documents/Schoolwork/NDL/BCI_project/eeg_reader/EEG_Trainer/Data"
+    return "/home/baserad/Documents/Schoolwork/NDL/BCI_project/EEG/EEG_Trainer/Data"
+
 def default_path():
     return str(os.getcwd())
 

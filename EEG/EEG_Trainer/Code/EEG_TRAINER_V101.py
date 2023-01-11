@@ -1,9 +1,16 @@
+import sys
+import os
+import path
+
+folder = path.Path(__file__).abspath()
+sys.path.append(folder.parent.parent.parent)
+
 from kivy.uix.pagelayout import PageLayout
 from kivy.uix.screenmanager import Screen, ScreenManager, FadeTransition
 import time
 import threading
 import multiprocessing
-import os
+
 import re
 import subprocess
 import matplotlib.pyplot as plt
@@ -31,8 +38,8 @@ from kivy.clock import Clock
 from kivy.graphics import Line, Color
 from kivy.uix.image import Image
 
-import Code.EEG as EEG
 import Code.eeg_trainer_functions as funcs
+import EEG
 
 """
     This file includes the python logic for the EEG training window.
@@ -135,7 +142,6 @@ class EEGTrainer(Screen):
         self.wait_time = float(settings.get["wait"])
         self.original_wait_time = self.wait_time
         self.start_wait_time = self.wait_time + 10
-        
         recorder = EEG.EEG_recorder(self.port, self.path, record_from_start=True)
         recorder.start_recording()
         recorder_loop_T.start()

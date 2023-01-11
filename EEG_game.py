@@ -1,15 +1,28 @@
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import train_test_split
-from invaders.game import *
+from game import *
 import numpy as np
-from sample_code.EEG_preprocessing import DataHandler
+from EEG.Preprocesser import DataHandler
+from EEG.EEG import LiveEEGRecorder
 from statistics import mean
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 import time
 #from eeg_reader.EEG_Trainer.Code.EEG import LiveEEGRecorder
 from statistics import mean, stdev
-"""
+from game import Game
+import multiprocessing
+from EEG.Preprocesser import BlankObj
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn import preprocessing
+from sklearn.model_selection import GridSearchCV
+from sklearn.neighbors import VALID_METRICS 
+from sklearn.metrics import confusion_matrix,plot_confusion_matrix
+
 recorder = None
 stop_update = multiprocessing.Event()
 
@@ -24,17 +37,17 @@ def update_recorder():
     
 recorder_loop_T = multiprocessing.Process(target=update_recorder)
 
-"""
+
 class EEGGame():
     def __init__(self):
-        self.time_saved = 4
-        self.extra_time_saved = 4
+        self.time_saved = 5
+        self.extra_time_saved = 10
 
 
         clear = lambda: os.system('clear')
         clear()
 
-        self.handler = DataHandler([1, 40], 240)
+        self.handler = DataHandler([1, 40], 500)
         self.user_data = []
 
         start = True
@@ -45,6 +58,7 @@ class EEGGame():
             path = str(input())
             try: 
                 self.handler.load_file(path)
+                self.handler.detrend()
                 print(self.handler)
                 start = False
                 clear()
@@ -59,44 +73,57 @@ class EEGGame():
             print()
             print("Please provide the port of your EEG device: (find port in trainer if unsure)")
             self.port = str(input())
-            try:
-                global recorder
-                recorder = LiveEEGRecorder(self.port)
-                self.raw_data = np.zeros(recorder.reader.frequency * (self.time_saved + self.extra_time_saved)).tolist()
-                self.sampling_rate = recorder.reader.frequency
-                start = False
-            except:
-                print(" >> There was an error! please confirm that the port is valid")
+            #try:
+            global recorder
+            recorder = LiveEEGRecorder(self.port)
+            self.raw_data = np.zeros(int(recorder.reader.frequency * (self.time_saved + self.extra_time_saved))).tolist()
+            self.sampling_rate = recorder.reader.frequency
+            start = False
+#            except:
+ #               print(" >> There was an error! please confirm that the port is valid")
         """
+        
+        neighs = np.arange(2,15)
+        trees = 100
+        a = np.arange(0.1, 10, 0.5)
+        n_topics = np.arange(1,150,1)
+        param_grid=dict(n_estimators = [100])
+        best_params = {}
 
-        skf = StratifiedKFold(n_splits=10)
         self.handler.segment(2)
-
-        possible_band_amounts = np.arange(3, 15)
+        print(self.handler)
+        print()
+        possible_band_amounts = np.arange(3, 20)
 
         best_band_amount = None
-        best_score = np.zeros(1).tolist()
+        best_score = 0
         best_overall_score = None
+        best_params = None
 
         for i in possible_band_amounts:
-            bands = self.handler.get_bands(2, 35, i)
+            bands = self.handler.get_bands(2, 33, i)
             X, y = self.handler.bandpowers(bands)
-            X, y = self.handler.average_series(X, y, 3)
+   
 
-            lda = LinearDiscriminantAnalysis()
+            clf_0 =  RandomForestClassifier()
+            clf = GridSearchCV(clf_0, param_grid, cv=5, scoring = "accuracy", verbose = 1)
+
+        
+           
             scores = []
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=32)
             X_train, X_test, y_train, y_test = np.array(X_train), np.array(X_test), np.array(y_train), np.array(y_test)
-            for train_index, test_index in skf.split(X_train, y_train):
-                x_train_fold, x_test_fold = X_train[train_index], X_train[test_index]
-                y_train_fold, y_test_fold = y_train[train_index], y_train[test_index]
-                lda.fit(x_train_fold, y_train_fold)
-                scores.append(lda.score(x_test_fold, y_test_fold))
+            grid_search = clf.fit(X_train, y_train)
+            print(grid_search.best_params_)
+            print(grid_search.best_score_)
+                
 
-            if mean(scores) > mean(best_score):
-                lda.fit(X_train, y_train)
-                best_overall_score = lda.score(X_test, y_test)
-                best_score = scores
+            if grid_search.best_score_ > best_score:
+                clf_real = RandomForestClassifier().set_params(**grid_search.best_params_)
+                best_params = grid_search.best_params_
+                clf_real.fit(X_train, y_train)
+                best_overall_score = clf_real.score(X_test, y_test)
+                best_score = grid_search.best_score_
                 best_band_amount = i
         
         print("BEST band amount: ",   best_band_amount)
@@ -104,48 +131,55 @@ class EEGGame():
         print()
         print("-------------------------------------------------------")
         print()
-        print('List of possible accuracy:', best_score)
-        print('\nMaximum Accuracy That can be obtained from this model is:',
-	        max(best_score)*100, '%')
-        print('\nMinimum Accuracy:',
-            min(best_score)*100, '%')
         print('\nOverall Accuracy:',
-            mean(best_score)*100, '%')
-        print('\nStandard Deviation is:', stdev(best_score))
-        print()
+            best_score*100, '%')
         print()
         print()
         print("press 'enter' to continue...")
         input()
-        self.bands = self.handler.get_bands(2, 35, best_band_amount)
-        X, y = self.handler.bandpowers(bands)
-        self.clf = LinearDiscriminantAnalysis()
+        self.bands = self.handler.get_bands(2, 33, best_band_amount)
+
+        print(self.bands)
+        X, y = self.handler.bandpowers(self.bands)
+        input()
+        self.clf = RandomForestClassifier()
+        self.clf.set_params(**best_params)
         self.clf.fit(X, y)
-        breakpoint()
+
         recorder_loop_T.start()
+        self.game = Game()
 
 
     def update(self):
-        time.sleep(0.1)
         global recorder
-        X, y = self.handle_data(recorder.get_latest())
+        X = self.handle_data(recorder.get_latest())
+        log_probas = self.clf.predict_proba(X)
+        print(log_probas)
+        print("score: ")
         prediction = self.clf.predict(X)
-        print(self.handler.label_names[prediction])
 
+        if prediction == 0:
+            self.game.goLeft()
+        if prediction == 1:
+            self.game.goRight()
+        self.game.update()
     
     def handle_data(self, data):
         self.raw_data.extend(data)
         saved_seconds = self.time_saved + self.extra_time_saved
         saved_values = (saved_seconds * self.sampling_rate)
         self.raw_data = self.raw_data[-int(saved_values):]
-        filtered_raw = self.handler.filter_and_resample(self.raw_data)
+        filtered_raw = self.handler.filter_and_resample(self.raw_data, saved_seconds)
         voi = self.time_saved * self.handler.sampling_rate
-        self.handler.set_signal(filtered_raw[-int(voi)])
-        return handler.bandpowers(self.best_band_amount)
+        self.handler.set_signal(filtered_raw[-int(voi):])
+        self.handler.segment(2)
+        X, y = self.handler.bandpowers(self.bands)
+        X,y = self.handler.average_series(X, interval = 2)
+        return X
 
 
 if __name__ == "__main__":
     game = EEGGame()
     while True:
-        game.Update()
+        game.update()
     stop_update.set()
